@@ -1,0 +1,97 @@
+/* 全体のリセットと基本設定 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background-color: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  padding: 10px;
+  padding-bottom: 80px;
+}
+
+.container { max-width: 800px; margin: 0 auto; text-align: center; }
+.stage-info { color: #888; font-size: 0.85rem; margin-bottom: 5px; font-weight: bold; }
+
+/* 呼び出しアラート (スマホ対応：1行にする) */
+.alert-box {
+  background: #ff3b30; color: white;
+  padding: 8px 10px; /* パディングを少し減らす */
+  font-weight: bold;
+  font-size: 1.1rem; /* PCでのサイズ */
+  border-radius: 6px;
+  margin-bottom: 15px;
+  animation: flash 0.5s infinite;
+  white-space: nowrap; /* 改行させない */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 600px) {
+  .alert-box {
+    font-size: 0.9rem; /* スマホでは文字を小さくして1行に収める */
+    padding: 6px;
+  }
+}
+.hidden { display: none !important; }
+@keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+/* メイン表示エリア */
+.display-area { padding: 5px 0 15px 0; border-bottom: 1px solid #333; margin-bottom: 20px; }
+.group-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 0; min-height: 1.2em; line-height: 1.2; }
+
+.timer-wrap { margin: 5px 0; }
+.timer {
+  font-size: 20vw; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -2px;
+}
+@media (min-width: 600px) { .timer { font-size: 9rem; letter-spacing: -5px; } }
+
+.status-row { display: flex; justify-content: center; gap: 15px; align-items: center; margin-bottom: 5px; }
+.status { font-size: 1.1rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; background: #222; }
+.diff-display { font-size: 1.1rem; font-family: monospace; }
+
+.next-info { font-size: 1rem; color: #888; margin-top: 5px; }
+.blink { animation: flash 1s infinite; }
+
+/* チャットエリア */
+.chat-section { text-align: left; margin-bottom: 20px; background: #111; padding: 10px; border-radius: 8px; border: 1px solid #333; }
+.chat-section h3 { font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; margin-bottom: 8px; padding-bottom: 5px; }
+.chat-box {
+  height: 180px; overflow-y: auto; 
+  padding: 5px; margin-bottom: 10px; 
+}
+.chat-input-row { display: flex; gap: 5px; }
+.chat-input-row input { padding: 8px; border-radius: 4px; border: 1px solid #444; background: #222; color: white; font-size: 16px; /* スマホでズームしないサイズ */ }
+#sendChatBtn { background: #007aff; padding: 0 15px; }
+
+/* 管理パネル */
+#adminPanel { text-align: left; background: #1a1a1a; padding: 15px; border-radius: 12px; margin-top: 20px; border: 1px solid #555; }
+#adminPanel h3 { font-size: 1rem; color: #fff; margin-bottom: 15px; border-bottom: 2px solid #007aff; padding-bottom: 5px; }
+#adminPanel h4 { font-size: 0.85rem; color: #aaa; margin-bottom: 5px; }
+
+.input-row { display: flex; gap: 8px; margin-bottom: 15px; }
+input { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #222; color: white; }
+#groupInput { flex: 1; }
+#minutesInput { width: 60px; }
+button { cursor: pointer; border: none; padding: 10px; border-radius: 6px; font-weight: bold; color: #fff; font-size: 0.9rem; }
+#addBtn { background: #007aff; min-width: 60px; }
+
+.play-buttons { margin-bottom: 10px; }
+.btn-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.btn-start { background: #28a745; flex: 1.5; padding: 12px; }
+.btn-next { background: #ff9500; flex: 1; padding: 12px; }
+.btn-call { background: #5856d6; width: 100%; padding: 12px; margin-bottom: 10px; }
+
+.btn-danger { background: #ff3b30; font-size: 0.8rem; padding: 8px 12px; }
+.btn-mini-danger { background: #ff3b30; padding: 3px 8px; font-size: 0.75rem; margin-left: 5px; }
+.btn-mini-success { background: #28a745; padding: 3px 8px; font-size: 0.75rem; margin-left: 5px; }
+
+.options { margin-bottom: 10px; font-size: 0.85rem; color: #ccc; }
+
+/* 出演リスト */
+.list-section { text-align: left; margin-top: 20px; }
+.list-section h3 { font-size: 0.9rem; color: #888; border-bottom: 1px solid #333; margin-bottom: 5px; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+th, td { border-bottom: 1px solid #333; padding: 8px 5px; text-align: left; }
+th { color: #888; font-size: 0.75rem; }
+td { font-size: 0.95rem; vertical-align: middle; }
+
+.text-right { text-align: right; }
