@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// --- Firebase設定 (変更なし) ---
+// --- Firebase設定 ---
 const firebaseConfig = {
   apiKey: "AIzaSyAUPBnBRIhZr20MC7pFXTCp98H68kLpP7I",
   authDomain: "stage-42595.firebaseapp.com",
@@ -18,9 +18,9 @@ const db = getDatabase(app);
 // --- 部屋(イベント)の判定と初期化 ---
 const urlParams = new URLSearchParams(window.location.search);
 const eventId = urlParams.get('id');
-const isAdmin = urlParams.get('pw') === 'seito';
+const isAdmin = urlParams.get('pw') === 'seito'; // ※運用時はパスワードをここでも変更できます
 
-let dbRef, chatRef; // Firebaseの参照先を動的にする
+let dbRef, chatRef; 
 
 // --- 背景・テーマ設定ロジック ---
 function applyTheme() {
@@ -69,11 +69,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // 2. イベントIDがある場合（通常起動）
   document.getElementById('roomNameDisplay').textContent = `Room: ${eventId}`;
   
-  // FirebaseのパスをイベントIDごとに分ける（マルチテナント化）
+  // FirebaseのパスをイベントIDごとに分ける
   dbRef = ref(db, `events/${eventId}/stageData`);
   chatRef = ref(db, `events/${eventId}/chatMessages`);
 
-  // 以下、以前と同じアプリ起動処理
   startApp();
 });
 
@@ -84,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function startApp() {
   setInterval(updateDisplay, 500);
 
-  // 設定モーダルの操作
+  // 設定モーダルの操作 (閲覧者・管理者共通で使える)
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
   
@@ -175,7 +174,7 @@ function startApp() {
       const mins = parseInt(minInput.value);
       if (name && mins) {
         const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-        groups.push({ name: name, minutes: mins }); // 配列の最後に追加される
+        groups.push({ name: name, minutes: mins });
         localStorage.setItem('groups', JSON.stringify(groups));
         nameInput.value = '';
         syncToCloud();
@@ -212,7 +211,6 @@ function startApp() {
         const idx = parseInt(localStorage.getItem('currentIndex') || '-1');
         const groups = JSON.parse(localStorage.getItem('groups') || '[]');
         
-        // 全演目終了状態への遷移を許可する
         if (idx < groups.length) {
             window.startGroup(idx + 1);
         }
@@ -290,7 +288,7 @@ function updateDisplay() {
   const nextGroupEl = document.getElementById('nextGroupName');
   const nextPrepEl = document.getElementById('nextPrepareMsg');
 
-  // ★「全演目終了」状態の追加
+  // 全演目終了状態
   if (idx === groups.length && groups.length > 0) {
     if (currentGroupEl) currentGroupEl.textContent = "🎉 全演目終了";
     if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#888"; }
@@ -311,7 +309,7 @@ function updateDisplay() {
       timerEl.textContent = formatTime(remaining);
       if (remaining < 0) timerEl.style.color = '#ff3b30';
       else if (remaining < 60000) timerEl.style.color = '#ffcc00';
-      else timerEl.style.color = ''; // テーマの文字色に従う
+      else timerEl.style.color = ''; 
     }
 
     if (firstGroupStartTime > 0 && firstGroupStartTime <= Date.now()) {
@@ -322,7 +320,7 @@ function updateDisplay() {
         if (diffEl) {
             diffEl.textContent = formatDiff(diff);
             if (diff > 60000) diffEl.style.color = '#ff3b30';
-            else if (diff < -60000) diffEl.style.color = '#00e5ff'; // 巻きは見やすい水色に変更
+            else if (diff < -60000) diffEl.style.color = '#00e5ff'; 
             else diffEl.style.color = '#4caf50';
         }
         if (statusEl) {
@@ -374,7 +372,6 @@ function renderGroupList() {
   groups.forEach((g, i) => {
     const tr = document.createElement('tr');
     
-    // 操作ボタンを横並びできれいに配置
     let actionHtml = '';
     if(isAdmin) {
         actionHtml = `
