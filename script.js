@@ -21,7 +21,6 @@ const offsetRef = ref(db, ".info/serverTimeOffset");
 onValue(offsetRef, (snap) => {
   serverTimeOffset = snap.val() || 0;
 });
-// 常に全員が同じ基準の時間を取得できる関数
 function getSyncedTime() {
   return Date.now() + serverTimeOffset;
 }
@@ -53,7 +52,6 @@ function applyTheme() {
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme();
 
-  // ログイン画面の処理
   if (!eventId) {
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('loginIsAdmin').addEventListener('change', (e) => {
@@ -63,7 +61,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('loginBtn').addEventListener('click', () => {
-      // スマホの予測変換などで大文字が入っても小文字に統一して同じ部屋に入れるように修正
       const inputId = document.getElementById('loginEventId').value.trim().toLowerCase();
       const isAdminCheck = document.getElementById('loginIsAdmin').checked;
       const inputPw = document.getElementById('loginAdminPw').value;
@@ -79,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // ルーム入室成功
   document.getElementById('roomNameDisplay').textContent = `Room: ${eventId}`;
   dbRef = ref(db, `events/${eventId}/stageData`);
   chatRef = ref(db, `events/${eventId}/chatMessages`);
@@ -119,15 +115,11 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // ★チャットシステム修正：削除時の同期と安定性を強化
+  // チャットシステム
   const chatArea = document.getElementById('chatArea');
   onValue(chatRef, (snapshot) => {
     if (!chatArea) return;
-    
-    // データを受信したらまずは画面を必ず空にする
     chatArea.innerHTML = ''; 
-    
-    // データが空（削除された）の場合はここで処理を終了して空白を保つ
     if (!snapshot.exists()) return;
 
     const messages = [];
@@ -166,19 +158,27 @@ function startApp() {
     setTimeout(() => { chatArea.scrollTop = chatArea.scrollHeight; }, 50);
   });
 
-  // タイマーのデータ同期
+  // ★修正箇所：タイマーのデータ同期とゴーストデータ対策
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
-      if (data.groups) localStorage.setItem('groups', JSON.stringify(data.groups));
+      localStorage.setItem('groups', JSON.stringify(data.groups || []));
       localStorage.setItem('currentIndex', data.currentIndex ?? -1);
       localStorage.setItem('startTime', data.startTime ?? 0);
       localStorage.setItem('firstGroupStartTime', data.firstGroupStartTime ?? 0);
       localStorage.setItem('endTime', data.endTime ?? 0);
       localStorage.setItem('callActive', data.callActive ?? false);
-      renderGroupList();
-      updateDisplay();
+    } else {
+      // データベースが空になったら、全端末のローカルデータも強制的に空にする
+      localStorage.setItem('groups', '[]');
+      localStorage.setItem('currentIndex', -1);
+      localStorage.setItem('startTime', 0);
+      localStorage.setItem('firstGroupStartTime', 0);
+      localStorage.setItem('endTime', 0);
+      localStorage.setItem('callActive', false);
     }
+    renderGroupList();
+    updateDisplay();
   });
 
   const sendBtn = document.getElementById('sendChatBtn');
@@ -190,14 +190,13 @@ function startApp() {
       push(chatRef, { 
         name: document.getElementById('chatName').value.trim() || '名無し', 
         text: text, 
-        time: getSyncedTime() // サーバー時刻を使用
+        time: getSyncedTime() 
       });
       msgInput.value = '';
     }
   };
 
   if (sendBtn) sendBtn.onclick = sendMessage;
-  
   if (msgInput) {
     msgInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -225,7 +224,6 @@ function startApp() {
       }
     };
 
-    // ★チャット削除の安定化（removeではなくnullをsetして確実に上書き同期する）
     document.getElementById('clearChatBtn').onclick = () => {
         if(confirm('チャット履歴を全て削除しますか？全員の画面から消えます。')) { 
           set(chatRef, null); 
@@ -237,11 +235,28 @@ function startApp() {
         syncToCloud();
     };
 
+    // ★修正箇所：リセットボタンの動作を強化（完全初期化データを明示的に送る）
     document.getElementById('clearBtn').onclick = () => {
-        if(confirm(`【危険】全データをリセットしますか？`)){ 
-            set(dbRef, null); 
+        if(confirm(`【危険】全データをリセットしますか？\n(全ての端末でデータが消去されます)`)){ 
+            const initialState = {
+              groups: [],
+              currentIndex: -1,
+              startTime: 0,
+              firstGroupStartTime: 0,
+              endTime: 0,
+              callActive: false
+            };
+            set(dbRef, initialState); // 空(null)ではなく、綺麗な初期状態を上書き
             set(chatRef, null); 
-            localStorage.clear();
+            
+            // 自分の端末もリセット
+            localStorage.setItem('groups', '[]');
+            localStorage.setItem('currentIndex', -1);
+            localStorage.setItem('startTime', 0);
+            localStorage.setItem('firstGroupStartTime', 0);
+            localStorage.setItem('endTime', 0);
+            localStorage.setItem('callActive', false);
+            
             location.reload(); 
         }
     };
@@ -339,7 +354,7 @@ function updateDisplay() {
     if (timerEl) { 
         timerEl.textContent = "00:00"; 
         timerEl.style.color = "#fff"; 
-        timerEl.style.opacity = "1"; // ★終了時も濃く表示
+        timerEl.style.opacity = "1";
     }
     
     const endTime = getIntItem('endTime', 0);
@@ -375,7 +390,7 @@ function updateDisplay() {
     if (timerEl) {
       timerEl.textContent = formatTime(remaining);
       timerEl.style.color = remaining < 0 ? '#ff3b30' : (remaining < 60000 ? '#ffcc00' : ''); 
-      timerEl.style.opacity = "1"; // ★スタートしたら確実に濃さを100%に戻す
+      timerEl.style.opacity = "1";
     }
 
     if (firstGroupStartTime > 0 && firstGroupStartTime <= getSyncedTime()) {
@@ -407,7 +422,7 @@ function updateDisplay() {
     if (timerEl) { 
         timerEl.textContent = "--:--"; 
         timerEl.style.color = "inherit"; 
-        timerEl.style.opacity = "0.5"; // 開始前は薄くする
+        timerEl.style.opacity = "0.5";
     }
     if (diffEl) diffEl.textContent = "";
     if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.color = "inherit"; }
