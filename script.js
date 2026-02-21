@@ -15,7 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ★追加: 端末間の時計のズレを無くすためのサーバー時刻補正
+// 端末間の時計のズレを無くすためのサーバー時刻補正
 let serverTimeOffset = 0;
 const offsetRef = ref(db, ".info/serverTimeOffset");
 onValue(offsetRef, (snap) => {
@@ -119,12 +119,17 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // ★チャットシステムを改善（一番下が最新になるように修正＆自動スクロール）
+  // ★チャットシステム修正：削除時の同期と安定性を強化
   const chatArea = document.getElementById('chatArea');
   onValue(chatRef, (snapshot) => {
     if (!chatArea) return;
+    
+    // データを受信したらまずは画面を必ず空にする
     chatArea.innerHTML = ''; 
     
+    // データが空（削除された）の場合はここで処理を終了して空白を保つ
+    if (!snapshot.exists()) return;
+
     const messages = [];
     snapshot.forEach((childSnap) => {
       messages.push(childSnap.val());
@@ -140,7 +145,6 @@ function startApp() {
       timeSpan.style.fontSize = '0.8rem';
       timeSpan.style.opacity = '0.6';
       
-      // PC/スマホで差が出ないよう手動で時間をフォーマット
       const d = new Date(msg.time);
       const h = d.getHours().toString().padStart(2, '0');
       const m = d.getMinutes().toString().padStart(2, '0');
@@ -159,11 +163,10 @@ function startApp() {
       chatArea.appendChild(div);
     });
 
-    // メッセージが追加されたら一番下にスクロール
     setTimeout(() => { chatArea.scrollTop = chatArea.scrollHeight; }, 50);
   });
 
-  // タイマーのデータ同期（NaNエラー防止）
+  // タイマーのデータ同期
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -195,7 +198,6 @@ function startApp() {
 
   if (sendBtn) sendBtn.onclick = sendMessage;
   
-  // ★スマホのキーボードの「確定/Enter」でも送信・暴発防止
   if (msgInput) {
     msgInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -223,8 +225,11 @@ function startApp() {
       }
     };
 
+    // ★チャット削除の安定化（removeではなくnullをsetして確実に上書き同期する）
     document.getElementById('clearChatBtn').onclick = () => {
-        if(confirm('チャット履歴を全て削除しますか？全員の画面から消えます。')) { remove(chatRef); }
+        if(confirm('チャット履歴を全て削除しますか？全員の画面から消えます。')) { 
+          set(chatRef, null); 
+        }
     };
 
     document.getElementById('manualCallBtn').onclick = () => {
@@ -235,7 +240,7 @@ function startApp() {
     document.getElementById('clearBtn').onclick = () => {
         if(confirm(`【危険】全データをリセットしますか？`)){ 
             set(dbRef, null); 
-            remove(chatRef); 
+            set(chatRef, null); 
             localStorage.clear();
             location.reload(); 
         }
@@ -292,7 +297,7 @@ const formatDiff = (diffMs) => {
 
 window.startGroup = (newIndex) => {
   localStorage.setItem('currentIndex', newIndex);
-  localStorage.setItem('startTime', getSyncedTime()); // サーバー時刻を使用
+  localStorage.setItem('startTime', getSyncedTime());
   if (newIndex === 0) {
       localStorage.setItem('firstGroupStartTime', getSyncedTime());
       localStorage.setItem('endTime', 0);
@@ -328,12 +333,16 @@ function updateDisplay() {
   const nextGroupEl = document.getElementById('nextGroupName');
   const nextPrepEl = document.getElementById('nextPrepareMsg');
 
+  // ①全演目終了時の処理
   if (idx === groups.length && groups.length > 0) {
     if (currentGroupEl) currentGroupEl.textContent = "🎉 全演目終了";
-    if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#fff"; }
+    if (timerEl) { 
+        timerEl.textContent = "00:00"; 
+        timerEl.style.color = "#fff"; 
+        timerEl.style.opacity = "1"; // ★終了時も濃く表示
+    }
     
     const endTime = getIntItem('endTime', 0);
-    
     if (firstGroupStartTime > 0 && endTime > 0) {
         let totalElapsed = 0;
         for (let i = 0; i < groups.length; i++) totalElapsed += groups[i].minutes * 60000;
@@ -356,16 +365,17 @@ function updateDisplay() {
     if (nextGroupEl) nextGroupEl.textContent = "なし";
     if (nextPrepEl) nextPrepEl.classList.add('hidden');
   } 
+  // ②進行中（スタート後）の処理
   else if (idx >= 0 && idx < groups.length) {
     const g = groups[idx];
     if (currentGroupEl) currentGroupEl.textContent = g.name;
 
-    // 現在時刻にもサーバー時刻を使用
     const remaining = (g.minutes * 60000) - (getSyncedTime() - startTime);
 
     if (timerEl) {
       timerEl.textContent = formatTime(remaining);
       timerEl.style.color = remaining < 0 ? '#ff3b30' : (remaining < 60000 ? '#ffcc00' : ''); 
+      timerEl.style.opacity = "1"; // ★スタートしたら確実に濃さを100%に戻す
     }
 
     if (firstGroupStartTime > 0 && firstGroupStartTime <= getSyncedTime()) {
@@ -391,9 +401,14 @@ function updateDisplay() {
       if (autoCheck && autoCheck.checked && remaining < -2000) window.startGroup(idx + 1); 
     }
   } 
+  // ③待機中の処理
   else {
     if (currentGroupEl) currentGroupEl.textContent = "---";
-    if (timerEl) { timerEl.textContent = "--:--"; timerEl.style.color = "inherit"; timerEl.style.opacity = "0.5"; }
+    if (timerEl) { 
+        timerEl.textContent = "--:--"; 
+        timerEl.style.color = "inherit"; 
+        timerEl.style.opacity = "0.5"; // 開始前は薄くする
+    }
     if (diffEl) diffEl.textContent = "";
     if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.color = "inherit"; }
   }
