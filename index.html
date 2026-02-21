@@ -3,94 +3,136 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Stage Timer</title>
+  <title>SAKURA TIMER - 進行管理アプリ</title>
   <link rel="stylesheet" href="style.css">
   <script type="module" src="script.js"></script>
 </head>
-<body>
-  <div class="container">
-    <div id="stageSchedule" class="stage-info">Total: 0min</div>
+<body class="theme-dark">
 
-    <div id="callAlert" class="alert-box" style="display: none;">
-      ⚠️ 次の団体 準備してください ⚠️
+  <div id="loginOverlay" class="modal-overlay hidden">
+    <div class="login-box">
+      <h2 style="color: #ff6b81;">SAKURA TIMER ログイン</h2>
+      <p>イベントIDを入力して入室してください</p>
+      <input type="text" id="loginEventId" placeholder="例: bunkasai2026 (半角英数字)">
+      <div class="login-options">
+        <label><input type="checkbox" id="loginIsAdmin"> 進行・管理者として入室</label>
+      </div>
+      <input type="password" id="loginAdminPw" class="hidden" placeholder="管理者パスワード">
+      <button id="loginBtn" class="btn-primary login-btn">入室する</button>
     </div>
+  </div>
 
-    <div class="display-area">
-      <div class="group-name" id="currentGroup">---</div>
-      
-      <div class="timer-wrap">
-        <div id="mainTimer" class="timer">--:--</div>
+  <div id="settingsModal" class="modal-overlay hidden">
+    <div class="settings-box">
+      <div class="settings-header">
+        <h3>⚙️ 背景・テーマ設定</h3>
+        <button id="closeSettingsBtn" class="btn-danger btn-sm">閉じる</button>
       </div>
-
-      <div class="status-row">
-        <div id="statusBadge" class="status">--</div>
-        <div id="diffTime" class="diff-display">±00:00</div>
+      <p class="settings-note">※ 背景設定はあなたの端末のみ適用されます</p>
+      <div class="theme-buttons">
+        <button class="theme-btn" data-theme="theme-dark">⬛ ダーク</button>
+        <button class="theme-btn" data-theme="theme-cool">🟦 クール</button>
+        <button class="theme-btn" data-theme="theme-cute">🌸 キュート</button>
+        <button class="theme-btn" data-theme="theme-pop">🟧 ポップ</button>
+        <button class="theme-btn" data-theme="theme-nature">🌿 ネイチャー</button>
       </div>
-      
-      <div class="next-info">
-        Next: <span id="nextGroupName">---</span>
-        <span id="nextPrepareMsg" class="blink prepare-msg" style="display: none;">(準備!)</span>
-      </div>
-    </div>
-
-    <div class="chat-section">
-      <div class="chat-header">
-        <h3>💬 連絡チャット</h3>
-        <button id="clearChatBtn" class="btn-danger btn-sm" style="display: none;">履歴削除</button>
-      </div>
-      <div id="chatArea" class="chat-box"></div>
-      <div class="chat-input-row">
-        <input type="text" id="chatName" class="chat-name-input" placeholder="名前" value="進行">
-        <input type="text" id="chatMsg" class="chat-msg-input" placeholder="メッセージを入力...">
-        <button id="sendChatBtn" class="btn-primary">送信</button>
+      <div class="custom-bg-section">
+        <h4>📸 好きな画像を背景にする</h4>
+        <input type="file" id="bgImageInput" accept="image/*" class="file-input">
+        <button id="clearBgBtn" class="btn-danger full-width">カスタム画像を解除</button>
       </div>
     </div>
+  </div>
 
-    <div id="adminPanel" style="display: none;">
-      <h3>👑 進行操作パネル</h3>
-      
-      <div class="play-buttons">
-        <div class="btn-row">
-          <button id="startFirst" class="btn-start">▶ 最初から開始</button>
-          <button id="nextBtn" class="btn-next">≫ 次の団体へ</button>
+  <div class="main-wrapper">
+    <div class="header-bar">
+      <span id="roomNameDisplay">Room: ---</span>
+      <button id="openSettingsBtn" class="btn-icon">⚙️</button>
+    </div>
+
+    <div class="container">
+      <div id="stageSchedule" class="stage-info">Total: 0min</div>
+
+      <div id="callAlert" class="alert-box" style="display: none;">
+        ⚠️ 次の団体 準備してください ⚠️
+      </div>
+
+      <div class="display-area">
+        <div class="group-name" id="currentGroup">---</div>
+        
+        <div class="timer-wrap">
+          <div id="mainTimer" class="timer">--:--</div>
         </div>
-        <div class="btn-row" style="margin-top: 10px;">
+
+        <div class="status-row">
+          <div id="statusBadge" class="status">--</div>
+          <div id="diffTime" class="diff-display">±00:00</div>
+        </div>
+        
+        <div class="next-info">
+          Next: <span id="nextGroupName">---</span>
+          <span id="nextPrepareMsg" class="blink prepare-msg" style="display: none;">(準備!)</span>
+        </div>
+      </div>
+
+      <div class="chat-section">
+        <div class="chat-header">
+          <h3>💬 連絡チャット</h3>
+          <button id="clearChatBtn" class="btn-danger btn-sm" style="display: none;">履歴削除</button>
+        </div>
+        <div id="chatArea" class="chat-box"></div>
+        <div class="chat-input-row">
+          <input type="text" id="chatName" class="chat-name-input" placeholder="名前">
+          <input type="text" id="chatMessage" class="chat-msg-input" placeholder="メッセージ">
+          <button id="sendChatBtn" class="btn-primary chat-send-btn">送信</button>
+        </div>
+      </div>
+
+      <div id="adminPanel" style="display: none;">
+        <h3>👑 進行操作パネル</h3>
+        
+        <div class="play-buttons">
+          <div class="btn-row">
+            <button id="startFirst" class="btn-start">▶ 最初から開始</button>
+            <button id="nextBtn" class="btn-next">≫ 次の団体へ</button>
+          </div>
           <button id="manualCallBtn" class="btn-call">🔔 呼び出しアラート切替</button>
+          
+          <div class="options">
+              <label><input type="checkbox" id="autoAdvance"> 時間切れで自動的に次へ</label>
+          </div>
         </div>
-        <div class="options">
-            <label><input type="checkbox" id="autoAdvance"> 時間切れで自動的に次へ</label>
+
+        <div class="controls admin-box">
+          <h4>➕ 新しい団体を追加</h4>
+          <div class="input-row">
+            <input type="text" id="groupInput" class="group-name-input" placeholder="団体名">
+            <input type="number" id="minutesInput" class="minutes-input" placeholder="分" min="1" value="5">
+            <button id="addBtn" class="btn-primary add-btn">追加</button>
+          </div>
+        </div>
+
+        <div class="danger-zone">
+          <button id="clearBtn" class="btn-danger">全データリセット (危険)</button>
         </div>
       </div>
 
-      <div class="controls admin-box">
-        <h4>➕ 団体追加</h4>
-        <div class="input-row">
-          <input type="text" id="groupInput" placeholder="団体名">
-          <input type="number" id="minutesInput" placeholder="分" min="1" value="5">
-          <button id="addBtn" class="btn-primary">追加</button>
+      <div class="list-section">
+        <h3>📋 出演リスト</h3>
+        <div class="table-responsive">
+          <table id="groupsTable">
+            <thead>
+              <tr>
+                  <th class="col-num">#</th>
+                  <th class="col-name">団体名</th>
+                  <th class="col-time">時間</th>
+                  <th class="col-action text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+            </tbody>
+          </table>
         </div>
-      </div>
-
-      <div class="danger-zone">
-        <button id="clearBtn" class="btn-danger">全データリセット (危険)</button>
-      </div>
-    </div>
-
-    <div class="list-section">
-      <h3>📋 出演リスト</h3>
-      <div class="table-responsive">
-        <table id="groupsTable">
-          <thead>
-            <tr>
-                <th class="col-num">#</th>
-                <th class="col-name">団体名</th>
-                <th class="col-time">時間</th>
-                <th class="col-action">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-          </tbody>
-        </table>
       </div>
     </div>
   </div>
