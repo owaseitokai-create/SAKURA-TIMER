@@ -14,7 +14,6 @@ body.theme-pop { --bg-color: #ffcc00; --panel-bg: rgba(255, 255, 255, 0.95); --t
 body.theme-nature { --bg-color: #e8f5e9; --panel-bg: rgba(255, 255, 255, 0.9); --text-color: #2e7d32; --accent-color: #4caf50; --table-stripe: rgba(0, 0, 0, 0.05); }
 body.theme-custom { --bg-color: #000; --panel-bg: rgba(0, 0, 0, 0.75); --text-color: #fff; }
 
-/* 全体のリセットと基本設定 */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   background-color: var(--bg-color);
@@ -27,114 +26,154 @@ body {
   background-attachment: fixed;
 }
 
-.main-wrapper { padding: 10px; padding-bottom: 80px; }
+/* 基本レイアウト (PC向けベース) */
+.main-wrapper { padding: 15px; padding-bottom: 80px; }
 .container { 
   max-width: 800px; 
   margin: 0 auto; 
-  text-align: center; 
   background: var(--panel-bg);
-  padding: 20px;
+  padding: 25px;
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
   backdrop-filter: blur(8px);
 }
 
-/* ヘッダー */
-.header-bar { max-width: 800px; margin: 0 auto 10px auto; display: flex; justify-content: space-between; align-items: center; padding: 0 10px; }
-#roomNameDisplay { font-weight: bold; background: var(--accent-color); color: #fff; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; }
-.btn-icon { background: none; border: none; font-size: 1.5rem; cursor: pointer; transition: transform 0.2s; }
+.header-bar { max-width: 800px; margin: 0 auto 10px auto; display: flex; justify-content: space-between; align-items: center; padding: 0 5px; }
+#roomNameDisplay { font-weight: bold; background: var(--accent-color); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.9rem; }
+.btn-icon { background: none; border: none; font-size: 1.5rem; cursor: pointer; transition: transform 0.2s; padding: 5px; }
 .btn-icon:hover { transform: rotate(45deg); }
 
-.stage-info { opacity: 0.8; font-size: 0.9rem; margin-bottom: 10px; font-weight: bold; }
+.stage-info { opacity: 0.8; font-size: 1rem; margin-bottom: 10px; font-weight: bold; text-align: center; }
 
-/* アラート */
 .alert-box {
-  background: #ff3b30; color: white; padding: 8px 10px; font-weight: bold;
-  font-size: 1.1rem; border-radius: 6px; margin-bottom: 15px;
-  animation: flash 0.5s infinite; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: #ff3b30; color: white; padding: 10px; font-weight: bold;
+  font-size: 1.2rem; border-radius: 8px; margin-bottom: 15px; text-align: center;
+  animation: flash 0.5s infinite;
 }
-@media (max-width: 600px) { .alert-box { font-size: 0.9rem; padding: 6px; } }
 .hidden { display: none !important; }
 @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-/* 表示エリア */
-.display-area { padding: 5px 0 15px 0; border-bottom: 1px solid rgba(128,128,128,0.3); margin-bottom: 20px; }
-.group-name { font-size: 1.8rem; font-weight: bold; margin-bottom: 5px; min-height: 1.2em; }
-.timer-wrap { margin: 5px 0; }
-.timer { font-size: 20vw; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-@media (min-width: 600px) { .timer { font-size: 9rem; letter-spacing: -5px; } }
+.display-area { text-align: center; padding: 10px 0 20px 0; border-bottom: 1px solid rgba(128,128,128,0.3); margin-bottom: 20px; }
+.group-name { font-size: 2rem; font-weight: bold; margin-bottom: 10px; min-height: 1.2em; word-break: break-all; }
+.timer-wrap { margin: 10px 0; }
+.timer { font-size: 9rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -3px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 
-.status-row { display: flex; justify-content: center; gap: 15px; align-items: center; margin-bottom: 10px; }
-.status { font-size: 1.2rem; font-weight: bold; padding: 6px 12px; border-radius: 8px; background: rgba(0,0,0,0.5); color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-.diff-display { font-size: 1.3rem; font-family: monospace; font-weight: bold; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 6px; color: #fff; }
+.status-row { display: flex; justify-content: center; gap: 15px; align-items: center; margin-bottom: 15px; }
+.status { font-size: 1.2rem; font-weight: bold; padding: 6px 16px; border-radius: 8px; background: rgba(0,0,0,0.5); color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+.diff-display { font-size: 1.4rem; font-family: monospace; font-weight: bold; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 8px; color: #fff; }
 
-.next-info { font-size: 1.1rem; opacity: 0.8; margin-top: 10px; }
+.next-info { font-size: 1.2rem; opacity: 0.8; margin-top: 10px; }
+.prepare-msg { color: #ffcc00; margin-left: 10px; }
 .blink { animation: flash 1s infinite; }
 
-/* チャット */
-.chat-section { text-align: left; margin-bottom: 20px; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(128,128,128,0.2); }
-.chat-section h3 { font-size: 1rem; border-bottom: 1px solid rgba(128,128,128,0.3); margin-bottom: 10px; padding-bottom: 5px; }
-.chat-box { height: 180px; overflow-y: auto; padding: 5px; margin-bottom: 10px; font-size: 0.95rem; }
-.chat-input-row { display: flex; gap: 5px; }
-.chat-input-row input { padding: 10px; border-radius: 6px; border: 1px solid rgba(128,128,128,0.5); background: rgba(255,255,255,0.1); color: var(--text-color); font-size: 16px; outline: none; }
+/* チャットエリア */
+.chat-section { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 12px; border: 1px solid rgba(128,128,128,0.2); margin-bottom: 25px; }
+.chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(128,128,128,0.3); padding-bottom: 5px; }
+.chat-header h3 { font-size: 1.1rem; }
+.chat-box { height: 200px; overflow-y: auto; padding: 5px; margin-bottom: 10px; font-size: 1rem; line-height: 1.4; word-break: break-all; }
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input-row input { padding: 12px; border-radius: 6px; border: 1px solid rgba(128,128,128,0.5); background: rgba(255,255,255,0.1); color: var(--text-color); font-size: 16px; outline: none; }
 .chat-input-row input:focus { border-color: var(--accent-color); }
+.chat-name-input { width: 25%; }
+.chat-msg-input { flex: 1; }
 
-/* ボタン基本 */
-button { cursor: pointer; border: none; padding: 10px; border-radius: 6px; font-weight: bold; color: #fff; font-size: 0.95rem; transition: opacity 0.2s, transform 0.1s; }
+/* 共通ボタン */
+button { cursor: pointer; border: none; padding: 12px; border-radius: 6px; font-weight: bold; color: #fff; font-size: 1rem; transition: opacity 0.2s, transform 0.1s; }
 button:active { transform: scale(0.95); }
 .btn-primary { background-color: var(--accent-color) !important; color: #ffffff !important; }
 .btn-danger { background-color: #ff3b30 !important; color: #ffffff !important; }
+.btn-sm { padding: 6px 12px; font-size: 0.85rem; }
+.full-width { width: 100%; }
 
-/* ★★★ パネル操作ボタンの強制レイアウト（絶対に間隔が空く設定） ★★★ */
-.play-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 20px; /* ここで上下のボタンの間に強制的に20pxの隙間を作ります */
-  margin-bottom: 25px;
-}
-.btn-row {
-  display: flex;
-  gap: 10px; /* 左右のボタンの隙間 */
-  width: 100%;
-}
-.btn-start { background-color: #28a745 !important; color: #ffffff !important; flex: 1; padding: 16px; font-size: 1.1rem; }
-.btn-next { background-color: #ff9500 !important; color: #ffffff !important; flex: 1; padding: 16px; font-size: 1.1rem; }
-.btn-call { background-color: #5856d6 !important; color: #ffffff !important; width: 100%; padding: 16px; font-size: 1.1rem; }
+/* 管理者パネル */
+#adminPanel { background: rgba(0,0,0,0.4); padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px solid rgba(128,128,128,0.3); }
+#adminPanel h3 { font-size: 1.2rem; margin-bottom: 15px; border-bottom: 2px solid var(--accent-color); padding-bottom: 5px; }
+.play-buttons { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; }
+.btn-row { display: flex; gap: 10px; width: 100%; }
+.btn-start { background-color: #28a745 !important; flex: 1; padding: 16px; font-size: 1.1rem; }
+.btn-next { background-color: #ff9500 !important; flex: 1; padding: 16px; font-size: 1.1rem; }
+.btn-call { background-color: #5856d6 !important; width: 100%; padding: 16px; font-size: 1.1rem; }
+.options { margin-top: 5px; font-size: 0.95rem; }
 
-/* 管理パネル */
-#adminPanel { text-align: left; background: rgba(0,0,0,0.4); padding: 20px; border-radius: 12px; margin-top: 20px; border: 1px solid rgba(128,128,128,0.3); }
-#adminPanel h3 { font-size: 1.1rem; margin-bottom: 15px; border-bottom: 2px solid var(--accent-color); padding-bottom: 5px; }
 .admin-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-top: 15px; }
-.admin-box h4 { margin-bottom: 10px; font-size: 0.9rem; opacity: 0.9; }
+.admin-box h4 { margin-bottom: 10px; font-size: 1rem; opacity: 0.9; }
 .input-row { display: flex; gap: 8px; }
-#groupInput { flex: 1; }
-#minutesInput { width: 70px; }
+.input-row input { padding: 12px; border-radius: 6px; border: 1px solid rgba(128,128,128,0.5); background: rgba(255,255,255,0.1); color: var(--text-color); font-size: 16px; outline: none; }
+.input-row input:focus { border-color: var(--accent-color); }
+.group-name-input { flex: 1; }
+.minutes-input { width: 80px; }
+.add-btn { padding: 12px 20px; }
+.danger-zone { text-align: right; margin-top: 20px; }
 
-/* リスト */
-.list-section { text-align: left; margin-top: 25px; }
-.list-section h3 { font-size: 1.1rem; border-bottom: 1px solid rgba(128,128,128,0.3); margin-bottom: 10px; padding-bottom: 5px; }
+/* リストセクション */
+.list-section h3 { font-size: 1.2rem; border-bottom: 1px solid rgba(128,128,128,0.3); margin-bottom: 10px; padding-bottom: 5px; }
 .table-responsive { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; margin-top: 5px; background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden; }
-th, td { border-bottom: 1px solid rgba(128,128,128,0.2); padding: 12px 8px; text-align: left; }
-th { opacity: 0.7; font-size: 0.8rem; background: rgba(0,0,0,0.4); }
-td { font-size: 1rem; vertical-align: middle; }
+table { width: 100%; border-collapse: collapse; background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden; min-width: 400px; }
+th, td { border-bottom: 1px solid rgba(128,128,128,0.2); padding: 12px 10px; text-align: left; vertical-align: middle; }
+th { opacity: 0.8; font-size: 0.9rem; background: rgba(0,0,0,0.4); }
+td { font-size: 1rem; }
 tbody tr:nth-child(even) { background-color: var(--table-stripe); } 
 .current-row { background-color: var(--accent-color) !important; color: #fff; font-weight: bold; }
+.col-num { width: 8%; } .col-name { width: 42%; } .col-time { width: 15%; } .col-action { width: 35%; }
+.text-right { text-align: right; }
 
-.action-buttons { display: flex; gap: 5px; justify-content: flex-end; }
-.btn-action { padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; }
-.btn-insert { background-color: #28a745 !important; color: #ffffff !important; }
-.btn-delete { background-color: #ff3b30 !important; color: #ffffff !important; }
+.action-buttons { display: flex; gap: 5px; justify-content: flex-end; flex-wrap: wrap; }
+.btn-action { padding: 6px 10px; border-radius: 4px; font-size: 0.85rem; }
+.btn-insert { background-color: #28a745 !important; }
+.btn-delete { background-color: #ff3b30 !important; }
 
-/* モーダル */
+/* モーダル (ログイン・設定) */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
-.login-box, .settings-box { background: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-.login-box h2 { margin-bottom: 10px; color: var(--accent-color); font-weight: bold; }
-.login-box p { font-size: 0.9rem; color: #aaa; margin-bottom: 15px; }
-.login-box input[type="text"], .login-box input[type="password"] { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 16px; outline: none; }
-.login-box input:focus { border-color: var(--accent-color); }
-.theme-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; margin-bottom: 20px; }
-.theme-btn { background: #333; color: #fff; border: 1px solid #555; }
-.theme-btn:hover { background: #444; }
-.custom-bg-section { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: left; }
-.custom-bg-section h4 { margin-bottom: 10px; font-size: 0.9rem; }
+.login-box, .settings-box { background: #1a1a1a; color: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+.login-box h2 { margin-bottom: 10px; color: var(--accent-color); text-align: center; }
+.login-box p { font-size: 0.9rem; color: #aaa; margin-bottom: 15px; text-align: center; }
+.login-box input[type="text"], .login-box input[type="password"] { width: 100%; padding: 14px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 16px; outline: none; margin-bottom: 10px; }
+.login-options { margin-bottom: 15px; font-size: 0.95rem; }
+.login-btn { width: 100%; padding: 14px; font-size: 1.1rem; }
+
+.settings-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.settings-note { font-size: 0.8rem; color: #aaa; margin-bottom: 15px; }
+.theme-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.theme-btn { background: #333; border: 1px solid #555; padding: 10px; }
+.custom-bg-section { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; }
+.file-input { width: 100%; margin: 10px 0; font-size: 0.9rem; }
+
+
+/* =========================================
+   📱 スマホ専用レスポンシブデザイン (600px以下)
+   ========================================= */
+@media (max-width: 600px) {
+  .main-wrapper { padding: 5px; padding-bottom: 60px; }
+  .container { padding: 15px 10px; border-radius: 8px; }
+  
+  .group-name { font-size: 1.5rem; margin-bottom: 5px; }
+  .timer { font-size: 24vw; letter-spacing: -1px; } 
+  .status { font-size: 1rem; padding: 6px 12px; }
+  .diff-display { font-size: 1.1rem; padding: 6px 10px; }
+  .next-info { font-size: 1rem; }
+  .alert-box { font-size: 1rem; padding: 8px; white-space: normal; }
+
+  .chat-section { padding: 10px; }
+  .chat-input-row { flex-direction: column; gap: 6px; }
+  .chat-name-input { width: 100%; }
+  .chat-msg-input { width: 100%; }
+  .chat-send-btn { width: 100%; padding: 14px; }
+
+  #adminPanel { padding: 15px 10px; }
+  .btn-row { flex-direction: column; gap: 10px; }
+  .btn-start, .btn-next, .btn-call { padding: 14px; font-size: 1.05rem; width: 100%; }
+  
+  .admin-box { padding: 12px 10px; }
+  .input-row { flex-direction: column; gap: 8px; }
+  .group-name-input { width: 100%; }
+  .minutes-input { width: 100%; }
+  .add-btn { width: 100%; padding: 14px; }
+
+  table { min-width: 100%; } 
+  th, td { padding: 8px 4px; font-size: 0.85rem; }
+  .col-num { width: 5%; } .col-name { width: 45%; } .col-time { width: 15%; } .col-action { width: 35%; }
+  .action-buttons { flex-direction: column; gap: 4px; }
+  .btn-action { padding: 8px; font-size: 0.8rem; width: 100%; text-align: center; }
+  
+  .login-box, .settings-box { padding: 20px 15px; width: 95%; }
+}

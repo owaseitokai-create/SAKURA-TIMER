@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, push, onValue, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // --- Firebase設定 ---
 const firebaseConfig = {
@@ -21,10 +21,14 @@ const isAdmin = urlParams.get('pw') === 'seito';
 
 let dbRef, chatRef; 
 
+// 背景設定を「イベントIDごと」に分けて保存
+const themeKey = eventId ? `theme_${eventId}` : 'theme_default';
+const bgKey = eventId ? `customBg_${eventId}` : 'customBg_default';
+
 function applyTheme() {
-  const savedTheme = localStorage.getItem('theme') || 'theme-dark';
+  const savedTheme = localStorage.getItem(themeKey) || 'theme-dark';
   document.body.className = savedTheme;
-  const customBg = localStorage.getItem('customBg');
+  const customBg = localStorage.getItem(bgKey);
   if (savedTheme === 'theme-custom' && customBg) {
     document.body.style.backgroundImage = `url(${customBg})`;
   } else {
@@ -35,6 +39,7 @@ function applyTheme() {
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme();
 
+  // ログイン画面の処理
   if (!eventId) {
     document.getElementById('loginOverlay').classList.remove('hidden');
     document.getElementById('loginIsAdmin').addEventListener('change', (e) => {
@@ -50,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!inputId) return alert("イベントIDを入力してください");
       if (!/^[a-zA-Z0-9_-]+$/.test(inputId)) return alert("IDは半角英数字とハイフンのみ");
       if (isAdminCheck && inputPw !== 'seito') return alert("パスワードが違います");
+      
       let nextUrl = `?id=${inputId}`;
       if (isAdminCheck) nextUrl += `&pw=seito`;
       window.location.href = nextUrl;
@@ -57,21 +63,26 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
+  // ルーム入室成功
   document.getElementById('roomNameDisplay').textContent = `Room: ${eventId}`;
+  
+  // 部屋ごとにデータベースを完全に分ける（チャット共有バグの根本対応）
   dbRef = ref(db, `events/${eventId}/stageData`);
   chatRef = ref(db, `events/${eventId}/chatMessages`);
+  
   startApp();
 });
 
 function startApp() {
   setInterval(updateDisplay, 500);
 
+  // 設定ボタン
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
   
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.onclick = (e) => {
-      localStorage.setItem('theme', e.target.getAttribute('data-theme'));
+      localStorage.setItem(themeKey, e.target.getAttribute('data-theme'));
       applyTheme();
     };
   });
@@ -81,32 +92,59 @@ function startApp() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (event) => {
-      localStorage.setItem('customBg', event.target.result);
-      localStorage.setItem('theme', 'theme-custom');
+      localStorage.setItem(bgKey, event.target.result);
+      localStorage.setItem(themeKey, 'theme-custom');
       applyTheme();
     };
     reader.readAsDataURL(file);
   });
   
   document.getElementById('clearBgBtn').onclick = () => {
-    localStorage.removeItem('customBg');
-    localStorage.setItem('theme', 'theme-dark');
+    localStorage.removeItem(bgKey);
+    localStorage.setItem(themeKey, 'theme-dark');
     applyTheme();
     document.getElementById('bgImageInput').value = "";
   };
 
+  // ★チャットシステムを改善（履歴削除が全員に同期されるように修正）
   const chatArea = document.getElementById('chatArea');
-  onChildAdded(chatRef, (snapshot) => {
-    const msg = snapshot.val();
-    const div = document.createElement('div');
-    div.style.marginBottom = '8px';
-    div.style.borderBottom = '1px solid rgba(128,128,128,0.3)';
-    div.style.paddingBottom = '5px';
-    const timeStr = new Date(msg.time).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
-    div.innerHTML = `<span style="font-size:0.8rem; opacity:0.6;">${timeStr}</span> <strong style="color:var(--accent-color)">${msg.name}:</strong> ${msg.text}`;
-    if (chatArea) chatArea.prepend(div);
+  onValue(chatRef, (snapshot) => {
+    if (!chatArea) return;
+    chatArea.innerHTML = ''; // 一旦クリアして全員同じ状態にする
+    
+    const messages = [];
+    snapshot.forEach((childSnap) => {
+      messages.push(childSnap.val());
+    });
+
+    // 新しいメッセージが上に来るように表示
+    messages.reverse().forEach((msg) => {
+      const div = document.createElement('div');
+      div.style.marginBottom = '8px';
+      div.style.borderBottom = '1px solid rgba(128,128,128,0.3)';
+      div.style.paddingBottom = '5px';
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.style.fontSize = '0.8rem';
+      timeSpan.style.opacity = '0.6';
+      timeSpan.textContent = new Date(msg.time).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'}) + ' ';
+      
+      const nameSpan = document.createElement('strong');
+      nameSpan.style.color = 'var(--accent-color)';
+      nameSpan.textContent = msg.name + ': ';
+      
+      const textSpan = document.createElement('span');
+      textSpan.textContent = msg.text;
+      
+      div.appendChild(timeSpan);
+      div.appendChild(nameSpan);
+      div.appendChild(textSpan);
+      
+      chatArea.appendChild(div);
+    });
   });
 
+  // タイマーのデータ同期
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -121,15 +159,31 @@ function startApp() {
     }
   });
 
+  // チャット送信処理
   const sendBtn = document.getElementById('sendChatBtn');
-  if (sendBtn) sendBtn.onclick = () => {
-    const msgInput = document.getElementById('chatMessage');
-    if (msgInput.value) {
-      push(chatRef, { name: document.getElementById('chatName').value || '名無し', text: msgInput.value, time: Date.now() });
+  const msgInput = document.getElementById('chatMessage');
+  
+  const sendMessage = () => {
+    if (msgInput.value.trim()) {
+      push(chatRef, { 
+        name: document.getElementById('chatName').value.trim() || '名無し', 
+        text: msgInput.value.trim(), 
+        time: Date.now() 
+      });
       msgInput.value = '';
     }
   };
 
+  if (sendBtn) sendBtn.onclick = sendMessage;
+  
+  // ★Enterキーを押してもチャットを送信できるように追加
+  if (msgInput) {
+    msgInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  }
+
+  // --- 管理者パネル ---
   const adminPanel = document.getElementById('adminPanel');
   if (isAdmin) {
     if (adminPanel) adminPanel.classList.remove('hidden');
@@ -148,7 +202,9 @@ function startApp() {
     };
 
     document.getElementById('clearChatBtn').onclick = () => {
-        if(confirm('チャット履歴を全て削除しますか？')) { remove(chatRef); if(chatArea) chatArea.innerHTML = ''; }
+        if(confirm('チャット履歴を全て削除しますか？全員の画面から消えます。')) { 
+            remove(chatRef); 
+        }
     };
 
     document.getElementById('manualCallBtn').onclick = () => {
@@ -157,7 +213,17 @@ function startApp() {
     };
 
     document.getElementById('clearBtn').onclick = () => {
-        if(confirm(`【危険】全データをリセットしますか？`)){ set(dbRef, null); remove(chatRef); localStorage.clear(); location.reload(); }
+        if(confirm(`【危険】全データをリセットしますか？`)){ 
+            set(dbRef, null); 
+            remove(chatRef); 
+            localStorage.removeItem('groups');
+            localStorage.removeItem('currentIndex');
+            localStorage.removeItem('startTime');
+            localStorage.removeItem('firstGroupStartTime');
+            localStorage.removeItem('endTime');
+            localStorage.removeItem('callActive');
+            location.reload(); 
+        }
     };
 
     document.getElementById('startFirst').onclick = () => {
@@ -176,7 +242,7 @@ function startApp() {
         } else if (nextIdx === groups.length) {
             if (confirm("全ての演目を終了しますか？")) {
                 localStorage.setItem('currentIndex', nextIdx);
-                localStorage.setItem('endTime', Date.now()); // 終了時刻を確定！
+                localStorage.setItem('endTime', Date.now()); 
                 syncToCloud();
                 updateDisplay();
             }
@@ -247,14 +313,12 @@ function updateDisplay() {
   const nextGroupEl = document.getElementById('nextGroupName');
   const nextPrepEl = document.getElementById('nextPrepareMsg');
 
-  // ★全演目終了時のロジック（テスト動作にも対応）
   if (idx === groups.length && groups.length > 0) {
     if (currentGroupEl) currentGroupEl.textContent = "🎉 全演目終了";
     if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#fff"; }
     
     const endTime = parseInt(localStorage.getItem('endTime') || '0');
     
-    // 最初から開始が押されていて、ちゃんと終了時間が記録されている場合のみ計算
     if (firstGroupStartTime > 0 && endTime > 0) {
         let totalElapsed = 0;
         for (let i = 0; i < groups.length; i++) totalElapsed += groups[i].minutes * 60000;
@@ -263,9 +327,9 @@ function updateDisplay() {
 
         if (diffEl) {
             diffEl.textContent = formatDiff(diff);
-            if (diff > 60000) diffEl.style.color = '#ff3b30'; // 押し
-            else if (diff < -60000) diffEl.style.color = '#00e5ff'; // 巻き
-            else diffEl.style.color = '#4caf50'; // 順調
+            if (diff > 60000) diffEl.style.color = '#ff3b30'; 
+            else if (diff < -60000) diffEl.style.color = '#00e5ff'; 
+            else diffEl.style.color = '#4caf50'; 
         }
         if (statusEl) {
              if (diff > 60000) { statusEl.textContent = '全体押し'; statusEl.style.color = '#ff3b30'; }
@@ -273,7 +337,6 @@ function updateDisplay() {
              else { statusEl.textContent = '予定通り'; statusEl.style.color = '#4caf50'; }
         }
     } else {
-        // テスト等で「最初から開始」を押さずに最後まで進めた場合
         if (diffEl) { diffEl.textContent = "--:--"; diffEl.style.color = "#aaa"; }
         if (statusEl) { statusEl.textContent = "データなし"; statusEl.style.color = "#aaa"; }
     }
@@ -281,7 +344,6 @@ function updateDisplay() {
     if (nextGroupEl) nextGroupEl.textContent = "なし";
     if (nextPrepEl) nextPrepEl.classList.add('hidden');
   } 
-  // 通常進行中
   else if (idx >= 0 && idx < groups.length) {
     const g = groups[idx];
     if (currentGroupEl) currentGroupEl.textContent = g.name;
@@ -316,7 +378,6 @@ function updateDisplay() {
       if (autoCheck && autoCheck.checked && remaining < -2000) window.startGroup(idx + 1); 
     }
   } 
-  // 待機中
   else {
     if (currentGroupEl) currentGroupEl.textContent = "---";
     if (timerEl) { timerEl.textContent = "--:--"; timerEl.style.color = "inherit"; opacity = 0.5; }
@@ -324,7 +385,6 @@ function updateDisplay() {
     if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.color = "inherit"; }
   }
 
-  // 次の団体
   if (idx >= 0 && idx < groups.length - 1) {
     if (nextGroupEl) nextGroupEl.textContent = groups[idx + 1].name;
     const currentRem = (groups[idx].minutes * 60000) - (Date.now() - startTime);
