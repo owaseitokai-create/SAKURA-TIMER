@@ -1,7 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-// --- Firebase設定 ---
 const firebaseConfig = {
   apiKey: "AIzaSyAUPBnBRIhZr20MC7pFXTCp98H68kLpP7I",
   authDomain: "stage-42595.firebaseapp.com",
@@ -21,7 +20,7 @@ const isAdmin = urlParams.get('pw') === 'seito';
 
 let dbRef, chatRef; 
 
-// 背景設定を「イベントIDごと」に保存
+// --- テーマ設定の保存と適用 ---
 const themeKey = eventId ? `theme_${eventId}` : 'theme_default';
 const bgKey = eventId ? `customBg_${eventId}` : 'customBg_default';
 
@@ -39,15 +38,18 @@ function applyTheme() {
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme();
 
+  // ★ URLにIDがない場合（未ログイン）
   if (!eventId) {
-    document.getElementById('loginOverlay').classList.remove('hidden');
-    document.getElementById('loginIsAdmin').addEventListener('change', (e) => {
+    const loginOverlay = document.getElementById('loginOverlay');
+    if(loginOverlay) loginOverlay.classList.remove('hidden');
+    
+    document.getElementById('loginIsAdmin')?.addEventListener('change', (e) => {
       const pwInput = document.getElementById('loginAdminPw');
       if(e.target.checked) pwInput.classList.remove('hidden');
       else pwInput.classList.add('hidden');
     });
 
-    document.getElementById('loginBtn').addEventListener('click', () => {
+    document.getElementById('loginBtn')?.addEventListener('click', () => {
       const inputId = document.getElementById('loginEventId').value.trim();
       const isAdminCheck = document.getElementById('loginIsAdmin').checked;
       const inputPw = document.getElementById('loginAdminPw').value;
@@ -58,8 +60,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isAdminCheck) nextUrl += `&pw=seito`;
       window.location.href = nextUrl;
     });
-    return;
+    return; // ここで処理を止める
   }
+
+  // ★ ログイン成功後
+  const mainContent = document.getElementById('mainContent');
+  if(mainContent) mainContent.classList.remove('hidden');
 
   document.getElementById('roomNameDisplay').textContent = `Room: ${eventId}`;
   dbRef = ref(db, `events/${eventId}/stageData`);
@@ -71,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function startApp() {
   setInterval(updateDisplay, 500);
 
-  // 設定ボタン
+  // 設定ボタンの動作
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
   
@@ -101,17 +107,16 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // ★修正1: チャットの完全同期（削除も全員に反映される）
+  // ★修正1: チャットの完全同期（全員の画面でリアルタイム更新）
   onValue(chatRef, (snapshot) => {
     const chatArea = document.getElementById('chatArea');
     if (!chatArea) return;
     
-    chatArea.innerHTML = ''; // 一旦全クリア
+    chatArea.innerHTML = ''; 
     const msgs = [];
     snapshot.forEach(child => msgs.push(child.val()));
     
-    // 新しいメッセージが上に来るように表示
-    msgs.reverse().forEach(msg => {
+    msgs.forEach(msg => {
       const div = document.createElement('div');
       div.style.marginBottom = '8px';
       div.style.borderBottom = '1px solid rgba(128,128,128,0.3)';
@@ -120,6 +125,7 @@ function startApp() {
       div.innerHTML = `<span style="font-size:0.8rem; opacity:0.6;">${timeStr}</span> <strong style="color:var(--accent-color)">${msg.name}:</strong> <span style="word-break: break-all;">${msg.text}</span>`;
       chatArea.appendChild(div);
     });
+    chatArea.scrollTop = chatArea.scrollHeight; // 自動で一番下にスクロール
   });
 
   onValue(dbRef, (snapshot) => {
@@ -136,7 +142,6 @@ function startApp() {
     }
   });
 
-  // チャット送信処理
   const sendBtn = document.getElementById('sendChatBtn');
   const msgInput = document.getElementById('chatMessage');
   
@@ -151,7 +156,6 @@ function startApp() {
   };
 
   if (sendBtn) sendBtn.onclick = sendMessage;
-  // ★追加機能: Enterキーでも送信可能
   if (msgInput) {
     msgInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') sendMessage();
@@ -178,9 +182,7 @@ function startApp() {
     };
 
     document.getElementById('clearChatBtn').onclick = () => {
-        if(confirm('チャット履歴を全て削除しますか？全員の画面から消えます。')) { 
-            remove(chatRef); 
-        }
+        if(confirm('チャット履歴を全て削除しますか？')) remove(chatRef); 
     };
 
     document.getElementById('manualCallBtn').onclick = () => {
@@ -188,7 +190,6 @@ function startApp() {
         syncToCloud();
     };
 
-    // リセット時にタイマーデータだけを消す
     document.getElementById('clearBtn').onclick = () => {
         if(confirm(`【危険】全データをリセットしますか？`)){ 
             set(dbRef, null); 
@@ -278,11 +279,9 @@ function updateDisplay() {
       schedEl.textContent = `Total: ${totalMinutes} min`;
   }
 
-  // ★修正2: アラートをJSで強制的に表示/非表示にコントロール
+  // ★修正2: アラートをJSで直接表示・非表示コントロール（スマホ競合防止）
   const alertBox = document.getElementById('callAlert');
-  if (alertBox) {
-    alertBox.style.display = callActive ? 'block' : 'none';
-  }
+  if (alertBox) alertBox.style.display = callActive ? 'block' : 'none';
 
   const currentGroupEl = document.getElementById('currentGroup');
   const timerEl = document.getElementById('mainTimer');
@@ -297,30 +296,18 @@ function updateDisplay() {
     if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#fff"; }
     
     const endTime = parseInt(localStorage.getItem('endTime') || '0');
-    
-    // 全体の押し巻き計算
     if (firstGroupStartTime > 0 && endTime > 0) {
         let totalElapsed = 0;
         for (let i = 0; i < groups.length; i++) totalElapsed += groups[i].minutes * 60000;
-        const idealEndTime = firstGroupStartTime + totalElapsed;
-        const diff = endTime - idealEndTime;
+        const diff = endTime - (firstGroupStartTime + totalElapsed);
 
-        if (diffEl) {
-            diffEl.textContent = formatDiff(diff);
-            if (diff > 60000) diffEl.style.color = '#ff3b30'; 
-            else if (diff < -60000) diffEl.style.color = '#00e5ff'; 
-            else diffEl.style.color = '#4caf50'; 
-        }
+        if (diffEl) diffEl.textContent = formatDiff(diff);
         if (statusEl) {
-             if (diff > 60000) { statusEl.textContent = '全体押し'; statusEl.style.color = '#ff3b30'; }
-             else if (diff < -60000) { statusEl.textContent = '全体巻き'; statusEl.style.color = '#00e5ff'; }
-             else { statusEl.textContent = '予定通り'; statusEl.style.color = '#4caf50'; }
+             if (diff > 60000) { statusEl.textContent = '全体押し'; statusEl.style.background = '#ff3b30'; }
+             else if (diff < -60000) { statusEl.textContent = '全体巻き'; statusEl.style.background = '#007aff'; }
+             else { statusEl.textContent = '予定通り'; statusEl.style.background = '#4caf50'; }
         }
-    } else {
-        if (diffEl) { diffEl.textContent = "--:--"; diffEl.style.color = "#aaa"; }
-        if (statusEl) { statusEl.textContent = "データなし"; statusEl.style.color = "#aaa"; }
     }
-
     if (nextGroupEl) nextGroupEl.textContent = "なし";
     if (nextPrepEl) nextPrepEl.style.display = 'none';
   } 
@@ -336,22 +323,16 @@ function updateDisplay() {
       timerEl.style.color = remaining < 0 ? '#ff3b30' : (remaining < 60000 ? '#ffcc00' : ''); 
     }
 
-    // 進行中の押し巻き計算
     if (firstGroupStartTime > 0 && firstGroupStartTime <= Date.now()) {
         let idealElapsed = 0;
         for (let i = 0; i < idx; i++) idealElapsed += groups[i].minutes * 60000;
         const diff = startTime - (firstGroupStartTime + idealElapsed);
 
-        if (diffEl) {
-            diffEl.textContent = formatDiff(diff);
-            if (diff > 60000) diffEl.style.color = '#ff3b30';
-            else if (diff < -60000) diffEl.style.color = '#00e5ff'; 
-            else diffEl.style.color = '#4caf50';
-        }
+        if (diffEl) diffEl.textContent = formatDiff(diff);
         if (statusEl) {
-             if (diff > 60000) { statusEl.textContent = '押し'; statusEl.style.color = '#ff3b30'; }
-             else if (diff < -60000) { statusEl.textContent = '巻き'; statusEl.style.color = '#00e5ff'; }
-             else { statusEl.textContent = '順調'; statusEl.style.color = '#4caf50'; }
+             if (diff > 60000) { statusEl.textContent = '押し'; statusEl.style.background = '#ff3b30'; }
+             else if (diff < -60000) { statusEl.textContent = '巻き'; statusEl.style.background = '#007aff'; }
+             else { statusEl.textContent = '順調'; statusEl.style.background = '#4caf50'; }
         }
     }
 
@@ -363,19 +344,16 @@ function updateDisplay() {
   // 待機中
   else {
     if (currentGroupEl) currentGroupEl.textContent = "---";
-    if (timerEl) { timerEl.textContent = "--:--"; timerEl.style.color = "inherit"; opacity = 0.5; }
-    if (diffEl) diffEl.textContent = "";
-    if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.color = "inherit"; }
+    if (timerEl) { timerEl.textContent = "--:--"; timerEl.style.color = "inherit"; }
+    if (diffEl) diffEl.textContent = "±00:00";
+    if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.background = "#555"; }
   }
 
   if (idx >= 0 && idx < groups.length - 1) {
     if (nextGroupEl) nextGroupEl.textContent = groups[idx + 1].name;
     const currentRem = (groups[idx].minutes * 60000) - (Date.now() - startTime);
-    
-    // JSで強制的に準備メッセージをコントロール
     if (currentRem < 180000 && nextPrepEl) nextPrepEl.style.display = 'inline';
     else if (nextPrepEl) nextPrepEl.style.display = 'none';
-    
   } else if (idx === groups.length - 1) {
     if (nextGroupEl) nextGroupEl.textContent = "(全日程終了へ)";
     if (nextPrepEl) nextPrepEl.style.display = 'none';
@@ -393,27 +371,11 @@ function renderGroupList() {
   
   groups.forEach((g, i) => {
     const tr = document.createElement('tr');
-    let actionHtml = isAdmin ? `
-      <div class="action-buttons">
-        <button class="btn-action btn-insert" onclick="window.insertGroup(${i})">上に挿入</button>
-        <button class="btn-action btn-delete" onclick="window.deleteGroup(${i})">削除</button>
-      </div>
-    ` : '-';
+    let actionHtml = isAdmin ? `<button class="btn-danger" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.deleteGroup(${i})">削除</button>` : '-';
     tr.innerHTML = `<td class="col-num">${i+1}</td><td class="col-name">${g.name}</td><td class="col-time">${g.minutes}分</td><td class="col-action text-right">${actionHtml}</td>`;
     table.appendChild(tr);
   });
 }
-
-window.insertGroup = (index) => {
-  const name = prompt("上に挿入する団体名を入力:");
-  if (!name) return;
-  const minsStr = prompt("持ち時間(分)を入力:", "5");
-  if (!minsStr) return;
-  const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-  groups.splice(index, 0, { name: name, minutes: parseInt(minsStr) });
-  localStorage.setItem('groups', JSON.stringify(groups));
-  syncToCloud();
-};
 
 window.deleteGroup = (index) => {
   if (confirm('この団体を削除しますか？')) {

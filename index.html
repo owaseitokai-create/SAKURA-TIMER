@@ -11,24 +11,24 @@
 
   <div id="loginOverlay" class="modal-overlay hidden">
     <div class="login-box">
-      <h2 style="color: #ff6b81;">SAKURA TIMER ログイン</h2>
-      <p>イベントIDを入力して入室してください</p>
+      <h2 style="color: #ff6b81; margin-bottom: 10px;">SAKURA TIMER ログイン</h2>
+      <p style="font-size: 0.9rem; color: #ccc; margin-bottom: 20px;">イベントIDを入力して入室してください</p>
       <input type="text" id="loginEventId" placeholder="例: bunkasai2026 (半角英数字)">
-      <div class="login-options">
+      <div class="login-options" style="text-align: left; margin: 15px 0;">
         <label><input type="checkbox" id="loginIsAdmin"> 進行・管理者として入室</label>
       </div>
       <input type="password" id="loginAdminPw" class="hidden" placeholder="管理者パスワード">
-      <button id="loginBtn" class="btn-primary login-btn">入室する</button>
+      <button id="loginBtn" class="btn-primary" style="width: 100%; padding: 14px; font-size: 1.1rem;">入室する</button>
     </div>
   </div>
 
   <div id="settingsModal" class="modal-overlay hidden">
     <div class="settings-box">
-      <div class="settings-header">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <h3>⚙️ 背景・テーマ設定</h3>
         <button id="closeSettingsBtn" class="btn-danger btn-sm">閉じる</button>
       </div>
-      <p class="settings-note">※ 背景設定はあなたの端末のみ適用されます</p>
+      <p style="text-align: left; font-size: 0.8rem; color: #ccc; margin-bottom: 15px;">※ 背景設定はあなたの端末のみ適用されます</p>
       <div class="theme-buttons">
         <button class="theme-btn" data-theme="theme-dark">⬛ ダーク</button>
         <button class="theme-btn" data-theme="theme-cool">🟦 クール</button>
@@ -38,18 +38,18 @@
       </div>
       <div class="custom-bg-section">
         <h4>📸 好きな画像を背景にする</h4>
-        <input type="file" id="bgImageInput" accept="image/*" class="file-input">
+        <input type="file" id="bgImageInput" accept="image/*" class="file-input" style="width: 100%; margin: 10px 0;">
         <button id="clearBgBtn" class="btn-danger full-width">カスタム画像を解除</button>
       </div>
     </div>
   </div>
 
-  <div class="main-wrapper">
+  <div id="mainContent" class="hidden">
     <div class="header-bar">
-      <span id="roomNameDisplay">Room: ---</span>
+      <span id="roomNameDisplay" class="room-badge">Room: ---</span>
       <button id="openSettingsBtn" class="btn-icon">⚙️</button>
     </div>
-
+    
     <div class="container">
       <div id="stageSchedule" class="stage-info">Total: 0min</div>
 
@@ -71,12 +71,12 @@
         
         <div class="next-info">
           Next: <span id="nextGroupName">---</span>
-          <span id="nextPrepareMsg" class="blink prepare-msg" style="display: none;">(準備!)</span>
+          <span id="nextPrepareMsg" class="blink prepare-msg" style="display: none; color:#ffcc00; margin-left:10px;">(準備!)</span>
         </div>
       </div>
 
       <div class="chat-section">
-        <div class="chat-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <h3>💬 連絡チャット</h3>
           <button id="clearChatBtn" class="btn-danger btn-sm" style="display: none;">履歴削除</button>
         </div>
@@ -88,8 +88,8 @@
         </div>
       </div>
 
-      <div id="adminPanel" style="display: none;">
-        <h3>👑 進行操作パネル</h3>
+      <div id="adminPanel" class="admin-panel" style="display: none;">
+        <h3 style="margin-bottom: 15px; border-bottom: 1px solid #555; padding-bottom: 5px;">👑 進行操作パネル</h3>
         
         <div class="play-buttons">
           <div class="btn-row">
@@ -98,13 +98,13 @@
           </div>
           <button id="manualCallBtn" class="btn-call">🔔 呼び出しアラート切替</button>
           
-          <div class="options">
+          <div class="options" style="margin-top: 10px;">
               <label><input type="checkbox" id="autoAdvance"> 時間切れで自動的に次へ</label>
           </div>
         </div>
 
         <div class="controls admin-box">
-          <h4>➕ 新しい団体を追加</h4>
+          <h4 style="margin-bottom: 10px;">団体追加</h4>
           <div class="input-row">
             <input type="text" id="groupInput" class="group-name-input" placeholder="団体名">
             <input type="number" id="minutesInput" class="minutes-input" placeholder="分" min="1" value="5">
@@ -112,27 +112,25 @@
           </div>
         </div>
 
-        <div class="danger-zone">
-          <button id="clearBtn" class="btn-danger">全データリセット (危険)</button>
+        <div style="text-align: right; margin-top: 15px;">
+          <button id="clearBtn" class="btn-danger">全データリセット</button>
         </div>
       </div>
 
       <div class="list-section">
-        <h3>📋 出演リスト</h3>
-        <div class="table-responsive">
-          <table id="groupsTable">
-            <thead>
-              <tr>
-                  <th class="col-num">#</th>
-                  <th class="col-name">団体名</th>
-                  <th class="col-time">時間</th>
-                  <th class="col-action text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-            </tbody>
-          </table>
-        </div>
+        <h3 style="border-bottom: 1px solid #555; margin-bottom: 10px; padding-bottom: 5px;">📋 出演リスト</h3>
+        <table id="groupsTable">
+          <thead>
+            <tr>
+                <th class="col-num">#</th>
+                <th class="col-name">団体名</th>
+                <th class="col-time">時間</th>
+                <th class="col-action text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
