@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, push, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // --- Firebase設定 ---
 const firebaseConfig = {
@@ -15,7 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// 端末間の時計のズレを無くすためのサーバー時刻補正
+// 端末間の時計ズレ補正（サーバー時刻）
 let serverTimeOffset = 0;
 const offsetRef = ref(db, ".info/serverTimeOffset");
 onValue(offsetRef, (snap) => {
@@ -25,10 +25,6 @@ function getSyncedTime() {
   return Date.now() + serverTimeOffset;
 }
 
-// データの安全な読み込み用ヘルパー
-const getIntItem = (key, def) => { const v = parseInt(localStorage.getItem(key)); return isNaN(v) ? def : v; };
-const getBoolItem = (key, def) => { const v = localStorage.getItem(key); return v === 'true' ? true : (v === 'false' ? false : def); };
-
 const urlParams = new URLSearchParams(window.location.search);
 const eventId = urlParams.get('id');
 const isAdmin = urlParams.get('pw') === 'seito';
@@ -37,6 +33,19 @@ let dbRef, chatRef;
 
 const themeKey = eventId ? `theme_${eventId}` : 'theme_default';
 const bgKey = eventId ? `customBg_${eventId}` : 'customBg_default';
+
+// ★改善1: LocalStorageを廃止し、システム全体の「唯一の正しいデータ」をここに保持
+let currentStageData = {
+  groups: [],
+  currentIndex: -1,
+  startTime: 0,
+  firstGroupStartTime: 0,
+  endTime: 0,
+  callActive: false
+};
+
+// ★改善2: 多重発火防止ロック（自動進行バグ対策）
+let lastAutoAdvancedIndex = -1;
 
 function applyTheme() {
   const savedTheme = localStorage.getItem(themeKey) || 'theme-dark';
@@ -83,19 +92,27 @@ document.addEventListener('DOMContentLoaded', () => {
   startApp();
 });
 
+// ★Firebaseへの安全な送信ヘルパー（必ず最新のcurrentStageDataをベースにする）
+function updateCloud(newData) {
+  if (!isAdmin) return;
+  set(dbRef, newData).catch(err => {
+    console.error("データの同期に失敗しました", err);
+    alert("通信エラーが発生しました。リロードしてください。");
+  });
+}
+
 function startApp() {
   setInterval(updateDisplay, 500);
 
+  // 設定パネルの制御
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
-  
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.onclick = (e) => {
       localStorage.setItem(themeKey, e.target.getAttribute('data-theme'));
       applyTheme();
     };
   });
-
   document.getElementById('bgImageInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -107,7 +124,6 @@ function startApp() {
     };
     reader.readAsDataURL(file);
   });
-  
   document.getElementById('clearBgBtn').onclick = () => {
     localStorage.removeItem(bgKey);
     localStorage.setItem(themeKey, 'theme-dark');
@@ -115,7 +131,7 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // チャットシステム
+  // チャット同期
   const chatArea = document.getElementById('chatArea');
   onValue(chatRef, (snapshot) => {
     if (!chatArea) return;
@@ -123,9 +139,7 @@ function startApp() {
     if (!snapshot.exists()) return;
 
     const messages = [];
-    snapshot.forEach((childSnap) => {
-      messages.push(childSnap.val());
-    });
+    snapshot.forEach((childSnap) => { messages.push(childSnap.val()); });
 
     messages.forEach((msg) => {
       const div = document.createElement('div');
@@ -158,24 +172,21 @@ function startApp() {
     setTimeout(() => { chatArea.scrollTop = chatArea.scrollHeight; }, 50);
   });
 
-  // ★修正箇所：タイマーのデータ同期とゴーストデータ対策
+  // ★重要：データの完全同期（Firebaseからの受信のみで内部状態を上書きする）
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
-      localStorage.setItem('groups', JSON.stringify(data.groups || []));
-      localStorage.setItem('currentIndex', data.currentIndex ?? -1);
-      localStorage.setItem('startTime', data.startTime ?? 0);
-      localStorage.setItem('firstGroupStartTime', data.firstGroupStartTime ?? 0);
-      localStorage.setItem('endTime', data.endTime ?? 0);
-      localStorage.setItem('callActive', data.callActive ?? false);
+      currentStageData = {
+        groups: data.groups || [],
+        currentIndex: data.currentIndex ?? -1,
+        startTime: data.startTime ?? 0,
+        firstGroupStartTime: data.firstGroupStartTime ?? 0,
+        endTime: data.endTime ?? 0,
+        callActive: data.callActive ?? false
+      };
     } else {
-      // データベースが空になったら、全端末のローカルデータも強制的に空にする
-      localStorage.setItem('groups', '[]');
-      localStorage.setItem('currentIndex', -1);
-      localStorage.setItem('startTime', 0);
-      localStorage.setItem('firstGroupStartTime', 0);
-      localStorage.setItem('endTime', 0);
-      localStorage.setItem('callActive', false);
+      currentStageData = { groups: [], currentIndex: -1, startTime: 0, firstGroupStartTime: 0, endTime: 0, callActive: false };
+      lastAutoAdvancedIndex = -1; // リセット時はロックも解除
     }
     renderGroupList();
     updateDisplay();
@@ -199,10 +210,7 @@ function startApp() {
   if (sendBtn) sendBtn.onclick = sendMessage;
   if (msgInput) {
     msgInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault(); 
-        sendMessage();
-      }
+      if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
     });
   }
 
@@ -212,74 +220,53 @@ function startApp() {
     if (adminPanel) adminPanel.classList.remove('hidden');
     document.getElementById('clearChatBtn').classList.remove('hidden');
 
+    // ★改善3：団体追加時の厳格なバリデーション
     document.getElementById('addBtn').onclick = () => {
-      const name = document.getElementById('groupInput').value;
+      const name = document.getElementById('groupInput').value.trim();
       const mins = parseInt(document.getElementById('minutesInput').value);
-      if (name && mins) {
-        const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-        groups.push({ name: name, minutes: mins });
-        localStorage.setItem('groups', JSON.stringify(groups));
-        document.getElementById('groupInput').value = '';
-        syncToCloud();
-      }
+      
+      if (!name) return alert("団体名を入力してください");
+      if (isNaN(mins) || mins <= 0) return alert("持ち時間は1以上の正しい数字を入力してください");
+
+      const newData = { ...currentStageData };
+      newData.groups = [...newData.groups, { name: name, minutes: mins }];
+      updateCloud(newData);
+      document.getElementById('groupInput').value = '';
     };
 
     document.getElementById('clearChatBtn').onclick = () => {
-        if(confirm('チャット履歴を全て削除しますか？全員の画面から消えます。')) { 
-          set(chatRef, null); 
-        }
+        if(confirm('チャット履歴を全て削除しますか？')) { set(chatRef, null); }
     };
 
     document.getElementById('manualCallBtn').onclick = () => {
-        localStorage.setItem('callActive', getBoolItem('callActive', false) ? 'false' : 'true');
-        syncToCloud();
+        const newData = { ...currentStageData };
+        newData.callActive = !newData.callActive;
+        updateCloud(newData);
     };
 
-    // ★修正箇所：リセットボタンの動作を強化（完全初期化データを明示的に送る）
     document.getElementById('clearBtn').onclick = () => {
         if(confirm(`【危険】全データをリセットしますか？\n(全ての端末でデータが消去されます)`)){ 
-            const initialState = {
-              groups: [],
-              currentIndex: -1,
-              startTime: 0,
-              firstGroupStartTime: 0,
-              endTime: 0,
-              callActive: false
-            };
-            set(dbRef, initialState); // 空(null)ではなく、綺麗な初期状態を上書き
+            const initialState = { groups: [], currentIndex: -1, startTime: 0, firstGroupStartTime: 0, endTime: 0, callActive: false };
+            set(dbRef, initialState);
             set(chatRef, null); 
-            
-            // 自分の端末もリセット
-            localStorage.setItem('groups', '[]');
-            localStorage.setItem('currentIndex', -1);
-            localStorage.setItem('startTime', 0);
-            localStorage.setItem('firstGroupStartTime', 0);
-            localStorage.setItem('endTime', 0);
-            localStorage.setItem('callActive', false);
-            
-            location.reload(); 
         }
     };
 
     document.getElementById('startFirst').onclick = () => {
-        const gs = JSON.parse(localStorage.getItem('groups') || '[]');
-        if (!gs.length) return alert("団体がありません");
-        if(confirm('最初の団体からスタートしますか？')){ window.startGroup(0); }
+        if (!currentStageData.groups.length) return alert("団体がありません");
+        if(confirm('最初の団体からスタートしますか？')){ startGroupIdx(0); }
     };
 
     document.getElementById('nextBtn').onclick = () => {
-        const idx = getIntItem('currentIndex', -1);
-        const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-        const nextIdx = idx + 1;
-        
-        if (nextIdx < groups.length) {
-            window.startGroup(nextIdx);
-        } else if (nextIdx === groups.length) {
+        const nextIdx = currentStageData.currentIndex + 1;
+        if (nextIdx < currentStageData.groups.length) {
+            startGroupIdx(nextIdx);
+        } else if (nextIdx === currentStageData.groups.length) {
             if (confirm("全ての演目を終了しますか？")) {
-                localStorage.setItem('currentIndex', nextIdx);
-                localStorage.setItem('endTime', getSyncedTime()); 
-                syncToCloud();
-                updateDisplay();
+                const newData = { ...currentStageData };
+                newData.currentIndex = nextIdx;
+                newData.endTime = getSyncedTime();
+                updateCloud(newData);
             }
         }
     };
@@ -288,17 +275,43 @@ function startApp() {
   }
 }
 
-function syncToCloud() {
-  if (!isAdmin) return;
-  set(dbRef, {
-    groups: JSON.parse(localStorage.getItem('groups') || '[]'),
-    currentIndex: getIntItem('currentIndex', -1),
-    startTime: getIntItem('startTime', 0), 
-    firstGroupStartTime: getIntItem('firstGroupStartTime', 0),
-    endTime: getIntItem('endTime', 0),
-    callActive: getBoolItem('callActive', false)
-  });
+// 進行用ヘルパー
+function startGroupIdx(newIndex) {
+  const newData = { ...currentStageData };
+  newData.currentIndex = newIndex;
+  newData.startTime = getSyncedTime();
+  if (newIndex === 0) {
+      newData.firstGroupStartTime = newData.startTime;
+      newData.endTime = 0;
+  }
+  newData.callActive = false;
+  updateCloud(newData);
 }
+
+// 共通関数のグローバル登録（リストからの直接操作用）
+window.insertGroup = (index) => {
+  const name = prompt("上に挿入する団体名を入力:");
+  if (!name || !name.trim()) return;
+  const minsStr = prompt("持ち時間(分)を入力:", "5");
+  const mins = parseInt(minsStr);
+  if (isNaN(mins) || mins <= 0) return alert("正しい時間を入力してください");
+
+  const newData = { ...currentStageData };
+  const newGroups = [...newData.groups];
+  newGroups.splice(index, 0, { name: name.trim(), minutes: mins });
+  newData.groups = newGroups;
+  updateCloud(newData);
+};
+
+window.deleteGroup = (index) => {
+  if (confirm('この団体を削除しますか？')) {
+    const newData = { ...currentStageData };
+    const newGroups = [...newData.groups];
+    newGroups.splice(index, 1);
+    newData.groups = newGroups;
+    updateCloud(newData);
+  }
+};
 
 const pad = (n) => n.toString().padStart(2, '0');
 const formatTime = (ms) => {
@@ -310,23 +323,8 @@ const formatDiff = (diffMs) => {
   return `${diffMs >= 0 ? '+' : '-'}${pad(Math.floor(abs / 60000))}:${pad(Math.floor((abs % 60000) / 1000))}`;
 };
 
-window.startGroup = (newIndex) => {
-  localStorage.setItem('currentIndex', newIndex);
-  localStorage.setItem('startTime', getSyncedTime());
-  if (newIndex === 0) {
-      localStorage.setItem('firstGroupStartTime', getSyncedTime());
-      localStorage.setItem('endTime', 0);
-  }
-  localStorage.setItem('callActive', 'false');
-  syncToCloud();
-};
-
 function updateDisplay() {
-  const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-  const idx = getIntItem('currentIndex', -1);
-  const startTime = getIntItem('startTime', 0); 
-  const firstGroupStartTime = getIntItem('firstGroupStartTime', 0);
-  const callActive = getBoolItem('callActive', false);
+  const { groups, currentIndex: idx, startTime, firstGroupStartTime, endTime, callActive } = currentStageData;
 
   const schedEl = document.getElementById('stageSchedule');
   let totalMinutes = groups.reduce((sum, g) => sum + g.minutes, 0);
@@ -348,16 +346,10 @@ function updateDisplay() {
   const nextGroupEl = document.getElementById('nextGroupName');
   const nextPrepEl = document.getElementById('nextPrepareMsg');
 
-  // ①全演目終了時の処理
   if (idx === groups.length && groups.length > 0) {
     if (currentGroupEl) currentGroupEl.textContent = "🎉 全演目終了";
-    if (timerEl) { 
-        timerEl.textContent = "00:00"; 
-        timerEl.style.color = "#fff"; 
-        timerEl.style.opacity = "1";
-    }
+    if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#fff"; timerEl.style.opacity = "1"; }
     
-    const endTime = getIntItem('endTime', 0);
     if (firstGroupStartTime > 0 && endTime > 0) {
         let totalElapsed = 0;
         for (let i = 0; i < groups.length; i++) totalElapsed += groups[i].minutes * 60000;
@@ -376,11 +368,9 @@ function updateDisplay() {
              else { statusEl.textContent = '予定通り'; statusEl.style.color = '#4caf50'; }
         }
     }
-
     if (nextGroupEl) nextGroupEl.textContent = "なし";
     if (nextPrepEl) nextPrepEl.classList.add('hidden');
   } 
-  // ②進行中（スタート後）の処理
   else if (idx >= 0 && idx < groups.length) {
     const g = groups[idx];
     if (currentGroupEl) currentGroupEl.textContent = g.name;
@@ -411,19 +401,20 @@ function updateDisplay() {
         }
     }
 
+    // ★改善2：自動進行機能の多重発火を完全にロック
     if (isAdmin && remaining <= 0) {
       const autoCheck = document.getElementById('autoAdvance');
-      if (autoCheck && autoCheck.checked && remaining < -2000) window.startGroup(idx + 1); 
+      if (autoCheck && autoCheck.checked && remaining < -2000) {
+        if (lastAutoAdvancedIndex !== idx) {
+            lastAutoAdvancedIndex = idx; // ここでロックをかける
+            startGroupIdx(idx + 1);
+        }
+      }
     }
   } 
-  // ③待機中の処理
   else {
     if (currentGroupEl) currentGroupEl.textContent = "---";
-    if (timerEl) { 
-        timerEl.textContent = "--:--"; 
-        timerEl.style.color = "inherit"; 
-        timerEl.style.opacity = "0.5";
-    }
+    if (timerEl) { timerEl.textContent = "--:--"; timerEl.style.color = "inherit"; timerEl.style.opacity = "0.5"; }
     if (diffEl) diffEl.textContent = "";
     if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.color = "inherit"; }
   }
@@ -446,7 +437,7 @@ function renderGroupList() {
   const table = document.querySelector('#groupsTable tbody');
   if (!table) return;
   table.innerHTML = '';
-  const groups = JSON.parse(localStorage.getItem('groups') || '[]');
+  const { groups } = currentStageData;
   
   groups.forEach((g, i) => {
     const tr = document.createElement('tr');
@@ -460,23 +451,3 @@ function renderGroupList() {
     table.appendChild(tr);
   });
 }
-
-window.insertGroup = (index) => {
-  const name = prompt("上に挿入する団体名を入力:");
-  if (!name) return;
-  const minsStr = prompt("持ち時間(分)を入力:", "5");
-  if (!minsStr) return;
-  const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-  groups.splice(index, 0, { name: name, minutes: parseInt(minsStr) });
-  localStorage.setItem('groups', JSON.stringify(groups));
-  syncToCloud();
-};
-
-window.deleteGroup = (index) => {
-  if (confirm('この団体を削除しますか？')) {
-    const groups = JSON.parse(localStorage.getItem('groups') || '[]');
-    groups.splice(index, 1);
-    localStorage.setItem('groups', JSON.stringify(groups));
-    syncToCloud();
-  }
-};
