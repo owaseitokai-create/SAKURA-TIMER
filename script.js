@@ -15,18 +15,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// --- 部屋(イベント)の判定と初期化 ---
 const urlParams = new URLSearchParams(window.location.search);
 const eventId = urlParams.get('id');
 const isAdmin = urlParams.get('pw') === 'seito';
 
 let dbRef, chatRef; 
 
-// --- 背景・テーマ設定ロジック ---
 function applyTheme() {
   const savedTheme = localStorage.getItem('theme') || 'theme-dark';
   document.body.className = savedTheme;
-  
   const customBg = localStorage.getItem('customBg');
   if (savedTheme === 'theme-custom' && customBg) {
     document.body.style.backgroundImage = `url(${customBg})`;
@@ -35,14 +32,11 @@ function applyTheme() {
   }
 }
 
-// 初期化処理
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme();
 
-  // 1. ログイン画面の処理
   if (!eventId) {
     document.getElementById('loginOverlay').classList.remove('hidden');
-    
     document.getElementById('loginIsAdmin').addEventListener('change', (e) => {
       const pwInput = document.getElementById('loginAdminPw');
       if(e.target.checked) pwInput.classList.remove('hidden');
@@ -53,11 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const inputId = document.getElementById('loginEventId').value.trim();
       const isAdminCheck = document.getElementById('loginIsAdmin').checked;
       const inputPw = document.getElementById('loginAdminPw').value;
-
       if (!inputId) return alert("イベントIDを入力してください");
-      if (!/^[a-zA-Z0-9_-]+$/.test(inputId)) return alert("IDは半角英数字とハイフンのみ使用できます");
+      if (!/^[a-zA-Z0-9_-]+$/.test(inputId)) return alert("IDは半角英数字とハイフンのみ");
       if (isAdminCheck && inputPw !== 'seito') return alert("パスワードが違います");
-
       let nextUrl = `?id=${inputId}`;
       if (isAdminCheck) nextUrl += `&pw=seito`;
       window.location.href = nextUrl;
@@ -65,29 +57,21 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // 2. イベントIDがある場合（通常起動）
   document.getElementById('roomNameDisplay').textContent = `Room: ${eventId}`;
-  
   dbRef = ref(db, `events/${eventId}/stageData`);
   chatRef = ref(db, `events/${eventId}/chatMessages`);
-
   startApp();
 });
 
-// =========================================================
-//  アプリメイン処理
-// =========================================================
 function startApp() {
   setInterval(updateDisplay, 500);
 
-  // 設定モーダルの操作
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
   
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.onclick = (e) => {
-      const theme = e.target.getAttribute('data-theme');
-      localStorage.setItem('theme', theme);
+      localStorage.setItem('theme', e.target.getAttribute('data-theme'));
       applyTheme();
     };
   });
@@ -111,7 +95,6 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // チャット
   const chatArea = document.getElementById('chatArea');
   onChildAdded(chatRef, (snapshot) => {
     const msg = snapshot.val();
@@ -124,7 +107,6 @@ function startApp() {
     if (chatArea) chatArea.prepend(div);
   });
 
-  // データ同期 (endTimeを追加)
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -132,78 +114,59 @@ function startApp() {
       localStorage.setItem('currentIndex', (data.currentIndex !== undefined) ? data.currentIndex : -1);
       localStorage.setItem('startTime', (data.startTime !== undefined) ? data.startTime : 0);
       localStorage.setItem('firstGroupStartTime', (data.firstGroupStartTime !== undefined) ? data.firstGroupStartTime : 0);
-      localStorage.setItem('endTime', (data.endTime !== undefined) ? data.endTime : 0); // ★追加
+      localStorage.setItem('endTime', (data.endTime !== undefined) ? data.endTime : 0);
       localStorage.setItem('callActive', data.callActive);
-      
       renderGroupList();
       updateDisplay();
     }
   });
 
-  // 送信ボタン
   const sendBtn = document.getElementById('sendChatBtn');
   if (sendBtn) sendBtn.onclick = () => {
-    const nameInput = document.getElementById('chatName');
     const msgInput = document.getElementById('chatMessage');
-    const name = nameInput.value || '名無し';
-    const msg = msgInput.value;
-    if (msg) {
-      push(chatRef, { name: name, text: msg, time: Date.now() });
+    if (msgInput.value) {
+      push(chatRef, { name: document.getElementById('chatName').value || '名無し', text: msgInput.value, time: Date.now() });
       msgInput.value = '';
     }
   };
 
-  // --- 管理パネル ---
   const adminPanel = document.getElementById('adminPanel');
-  const clearChatBtn = document.getElementById('clearChatBtn');
-
   if (isAdmin) {
     if (adminPanel) adminPanel.classList.remove('hidden');
-    if (clearChatBtn) clearChatBtn.classList.remove('hidden');
+    document.getElementById('clearChatBtn').classList.remove('hidden');
 
-    const addBtn = document.getElementById('addBtn');
-    if (addBtn) addBtn.onclick = () => {
-      const nameInput = document.getElementById('groupInput');
-      const minInput = document.getElementById('minutesInput');
-      const name = nameInput.value;
-      const mins = parseInt(minInput.value);
+    document.getElementById('addBtn').onclick = () => {
+      const name = document.getElementById('groupInput').value;
+      const mins = parseInt(document.getElementById('minutesInput').value);
       if (name && mins) {
         const groups = JSON.parse(localStorage.getItem('groups') || '[]');
         groups.push({ name: name, minutes: mins });
         localStorage.setItem('groups', JSON.stringify(groups));
-        nameInput.value = '';
+        document.getElementById('groupInput').value = '';
         syncToCloud();
       }
     };
 
-    if (clearChatBtn) clearChatBtn.onclick = () => {
+    document.getElementById('clearChatBtn').onclick = () => {
         if(confirm('チャット履歴を全て削除しますか？')) { remove(chatRef); if(chatArea) chatArea.innerHTML = ''; }
     };
 
-    const manualCallBtn = document.getElementById('manualCallBtn');
-    if (manualCallBtn) manualCallBtn.onclick = () => {
-        const current = localStorage.getItem('callActive') === 'true';
-        localStorage.setItem('callActive', !current);
+    document.getElementById('manualCallBtn').onclick = () => {
+        localStorage.setItem('callActive', localStorage.getItem('callActive') === 'true' ? 'false' : 'true');
         syncToCloud();
     };
 
-    const clearBtn = document.getElementById('clearBtn');
-    if (clearBtn) clearBtn.onclick = () => {
-        if(confirm(`【危険】Room: ${eventId} の全データをリセットしますか？`)){
-          set(dbRef, null); remove(chatRef); localStorage.clear(); location.reload();
-        }
+    document.getElementById('clearBtn').onclick = () => {
+        if(confirm(`【危険】全データをリセットしますか？`)){ set(dbRef, null); remove(chatRef); localStorage.clear(); location.reload(); }
     };
 
-    const startFirstBtn = document.getElementById('startFirst');
-    if (startFirstBtn) startFirstBtn.onclick = () => {
+    document.getElementById('startFirst').onclick = () => {
         const gs = JSON.parse(localStorage.getItem('groups') || '[]');
-        if (!gs.length) return alert("団体が登録されていません");
+        if (!gs.length) return alert("団体がありません");
         if(confirm('最初の団体からスタートしますか？')){ window.startGroup(0); }
     };
 
-    // ★次の団体へボタンのロジック（終了確認を追加）
-    const nextBtn = document.getElementById('nextBtn');
-    if (nextBtn) nextBtn.onclick = () => {
+    document.getElementById('nextBtn').onclick = () => {
         const idx = parseInt(localStorage.getItem('currentIndex') || '-1');
         const groups = JSON.parse(localStorage.getItem('groups') || '[]');
         const nextIdx = idx + 1;
@@ -213,7 +176,7 @@ function startApp() {
         } else if (nextIdx === groups.length) {
             if (confirm("全ての演目を終了しますか？")) {
                 localStorage.setItem('currentIndex', nextIdx);
-                localStorage.setItem('endTime', Date.now()); // 終了時刻を記録
+                localStorage.setItem('endTime', Date.now()); // 終了時刻を確定！
                 syncToCloud();
                 updateDisplay();
             }
@@ -221,40 +184,29 @@ function startApp() {
     };
   } else {
     if (adminPanel) adminPanel.classList.add('hidden');
-    if (clearChatBtn) clearChatBtn.classList.add('hidden');
   }
 }
 
-// =========================================================
-//  補助・画面更新ロジック
-// =========================================================
 function syncToCloud() {
   if (!isAdmin) return;
-  const data = {
+  set(dbRef, {
     groups: JSON.parse(localStorage.getItem('groups') || '[]'),
     currentIndex: parseInt(localStorage.getItem('currentIndex') || '-1'),
     startTime: parseInt(localStorage.getItem('startTime') || '0'), 
     firstGroupStartTime: parseInt(localStorage.getItem('firstGroupStartTime') || '0'),
-    endTime: parseInt(localStorage.getItem('endTime') || '0'), // ★追加
+    endTime: parseInt(localStorage.getItem('endTime') || '0'),
     callActive: localStorage.getItem('callActive') === 'true'
-  };
-  set(dbRef, data);
+  });
 }
 
 const pad = (n) => n.toString().padStart(2, '0');
 const formatTime = (ms) => {
   if (ms < 0) ms = 0;
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${pad(m)}:${pad(s)}`;
+  return `${pad(Math.floor(ms / 60000))}:${pad(Math.floor((ms % 60000) / 1000))}`;
 };
 const formatDiff = (diffMs) => {
   const abs = Math.abs(diffMs);
-  const m = Math.floor(abs / 60000);
-  const s = Math.floor((abs % 60000) / 1000);
-  const sign = diffMs >= 0 ? '+' : '-'; 
-  return `${sign}${pad(m)}:${pad(s)}`;
+  return `${diffMs >= 0 ? '+' : '-'}${pad(Math.floor(abs / 60000))}:${pad(Math.floor((abs % 60000) / 1000))}`;
 };
 
 window.startGroup = (newIndex) => {
@@ -262,7 +214,7 @@ window.startGroup = (newIndex) => {
   localStorage.setItem('startTime', Date.now());
   if (newIndex === 0) {
       localStorage.setItem('firstGroupStartTime', Date.now());
-      localStorage.setItem('endTime', 0); // リセット
+      localStorage.setItem('endTime', 0);
   }
   localStorage.setItem('callActive', 'false');
   syncToCloud();
@@ -279,9 +231,8 @@ function updateDisplay() {
   let totalMinutes = groups.reduce((sum, g) => sum + g.minutes, 0);
   if (firstGroupStartTime > 0) {
       const endD = new Date(firstGroupStartTime + totalMinutes * 60000);
-      const fmt = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
       const startD = new Date(firstGroupStartTime);
-      schedEl.textContent = `Schedule: ${fmt(startD)} - ${fmt(endD)} (計${totalMinutes}分)`;
+      schedEl.textContent = `Schedule: ${pad(startD.getHours())}:${pad(startD.getMinutes())} - ${pad(endD.getHours())}:${pad(endD.getMinutes())} (計${totalMinutes}分)`;
   } else {
       schedEl.textContent = `Total: ${totalMinutes} min`;
   }
@@ -296,13 +247,14 @@ function updateDisplay() {
   const nextGroupEl = document.getElementById('nextGroupName');
   const nextPrepEl = document.getElementById('nextPrepareMsg');
 
-  // ★全演目終了状態（全体の押し巻き計算）
+  // ★全演目終了時のロジック（テスト動作にも対応）
   if (idx === groups.length && groups.length > 0) {
     if (currentGroupEl) currentGroupEl.textContent = "🎉 全演目終了";
     if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#fff"; }
     
     const endTime = parseInt(localStorage.getItem('endTime') || '0');
     
+    // 最初から開始が押されていて、ちゃんと終了時間が記録されている場合のみ計算
     if (firstGroupStartTime > 0 && endTime > 0) {
         let totalElapsed = 0;
         for (let i = 0; i < groups.length; i++) totalElapsed += groups[i].minutes * 60000;
@@ -311,15 +263,19 @@ function updateDisplay() {
 
         if (diffEl) {
             diffEl.textContent = formatDiff(diff);
-            if (diff > 60000) diffEl.style.color = '#ff3b30';
-            else if (diff < -60000) diffEl.style.color = '#00e5ff'; 
-            else diffEl.style.color = '#4caf50';
+            if (diff > 60000) diffEl.style.color = '#ff3b30'; // 押し
+            else if (diff < -60000) diffEl.style.color = '#00e5ff'; // 巻き
+            else diffEl.style.color = '#4caf50'; // 順調
         }
         if (statusEl) {
              if (diff > 60000) { statusEl.textContent = '全体押し'; statusEl.style.color = '#ff3b30'; }
              else if (diff < -60000) { statusEl.textContent = '全体巻き'; statusEl.style.color = '#00e5ff'; }
              else { statusEl.textContent = '予定通り'; statusEl.style.color = '#4caf50'; }
         }
+    } else {
+        // テスト等で「最初から開始」を押さずに最後まで進めた場合
+        if (diffEl) { diffEl.textContent = "--:--"; diffEl.style.color = "#aaa"; }
+        if (statusEl) { statusEl.textContent = "データなし"; statusEl.style.color = "#aaa"; }
     }
 
     if (nextGroupEl) nextGroupEl.textContent = "なし";
@@ -330,14 +286,11 @@ function updateDisplay() {
     const g = groups[idx];
     if (currentGroupEl) currentGroupEl.textContent = g.name;
 
-    const elapsed = Date.now() - startTime;
-    const remaining = (g.minutes * 60000) - elapsed;
+    const remaining = (g.minutes * 60000) - (Date.now() - startTime);
 
     if (timerEl) {
       timerEl.textContent = formatTime(remaining);
-      if (remaining < 0) timerEl.style.color = '#ff3b30';
-      else if (remaining < 60000) timerEl.style.color = '#ffcc00';
-      else timerEl.style.color = ''; 
+      timerEl.style.color = remaining < 0 ? '#ff3b30' : (remaining < 60000 ? '#ffcc00' : ''); 
     }
 
     if (firstGroupStartTime > 0 && firstGroupStartTime <= Date.now()) {
@@ -371,11 +324,10 @@ function updateDisplay() {
     if (statusEl) { statusEl.textContent = "待機中"; statusEl.style.color = "inherit"; }
   }
 
-  // 次の団体表示
+  // 次の団体
   if (idx >= 0 && idx < groups.length - 1) {
     if (nextGroupEl) nextGroupEl.textContent = groups[idx + 1].name;
-    const elapsed = Date.now() - startTime;
-    const currentRem = (groups[idx].minutes * 60000) - elapsed;
+    const currentRem = (groups[idx].minutes * 60000) - (Date.now() - startTime);
     if (currentRem < 180000 && nextPrepEl) nextPrepEl.classList.remove('hidden');
     else if (nextPrepEl) nextPrepEl.classList.add('hidden');
   } else if (idx === groups.length - 1) {
@@ -383,12 +335,8 @@ function updateDisplay() {
     if (nextPrepEl) nextPrepEl.classList.add('hidden');
   }
 
-  // リストのハイライト更新
   const rows = document.querySelectorAll('#groupsTable tbody tr');
-  rows.forEach((tr, i) => {
-    if (i === idx) tr.classList.add('current-row');
-    else tr.classList.remove('current-row');
-  });
+  rows.forEach((tr, i) => i === idx ? tr.classList.add('current-row') : tr.classList.remove('current-row'));
 }
 
 function renderGroupList() {
@@ -399,36 +347,22 @@ function renderGroupList() {
   
   groups.forEach((g, i) => {
     const tr = document.createElement('tr');
-    
-    let actionHtml = '';
-    if(isAdmin) {
-        actionHtml = `
-          <div class="action-buttons">
-            <button class="btn-action btn-insert" onclick="window.insertGroup(${i})" title="上に挿入">上に挿入</button>
-            <button class="btn-action btn-delete" onclick="window.deleteGroup(${i})" title="削除">削除</button>
-          </div>
-        `;
-    } else {
-        actionHtml = '-'; 
-    }
-
-    tr.innerHTML = `
-      <td>${i+1}</td>
-      <td>${g.name}</td>
-      <td>${g.minutes}分</td>
-      <td class="text-right">${actionHtml}</td>
-    `;
+    let actionHtml = isAdmin ? `
+      <div class="action-buttons">
+        <button class="btn-action btn-insert" onclick="window.insertGroup(${i})">上に挿入</button>
+        <button class="btn-action btn-delete" onclick="window.deleteGroup(${i})">削除</button>
+      </div>
+    ` : '-';
+    tr.innerHTML = `<td>${i+1}</td><td>${g.name}</td><td>${g.minutes}分</td><td class="text-right">${actionHtml}</td>`;
     table.appendChild(tr);
   });
 }
 
-// リストからの挿入・削除処理
 window.insertGroup = (index) => {
-  const name = prompt("上に挿入する団体名を入力してください:");
+  const name = prompt("上に挿入する団体名を入力:");
   if (!name) return;
   const minsStr = prompt("持ち時間(分)を入力:", "5");
   if (!minsStr) return;
-  
   const groups = JSON.parse(localStorage.getItem('groups') || '[]');
   groups.splice(index, 0, { name: name, minutes: parseInt(minsStr) });
   localStorage.setItem('groups', JSON.stringify(groups));

@@ -82,9 +82,7 @@
           <h3>💬 連絡チャット</h3>
           <button id="clearChatBtn" class="btn-danger hidden" style="padding: 5px 10px; font-size: 0.8rem;">履歴削除</button>
         </div>
-        
         <div id="chatArea" class="chat-box"></div>
-        
         <div class="chat-input-row">
           <input type="text" id="chatName" placeholder="名前" style="width: 25%;">
           <input type="text" id="chatMessage" placeholder="メッセージ" style="flex: 1;">
@@ -96,13 +94,12 @@
         <h3>👑 進行操作パネル</h3>
         
         <div class="play-buttons">
-          <div class="btn-row symmetrical-row">
-            <button id="startFirst" class="btn-start">▶ 最初から開始</button>
-            <button id="nextBtn" class="btn-next">≫ 次の団体へ終了</button>
-          </div>
           <div class="btn-row">
-            <button id="manualCallBtn" class="btn-call">🔔 呼び出しアラート切替</button>
+            <button id="startFirst" class="btn-start">▶ 最初から開始</button>
+            <button id="nextBtn" class="btn-next">≫ 次の団体へ</button>
           </div>
+          <button id="manualCallBtn" class="btn-call">🔔 呼び出しアラート切替</button>
+          
           <div class="options">
               <label><input type="checkbox" id="autoAdvance"> 時間切れで自動的に次へ</label>
           </div>
