@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+import { getDatabase, ref, set, push, onValue, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 // --- Firebase設定 ---
 const firebaseConfig = {
@@ -31,10 +31,7 @@ const isAdmin = urlParams.get('pw') === 'seito';
 
 let dbRef, chatRef; 
 
-const themeKey = eventId ? `theme_${eventId}` : 'theme_default';
-const bgKey = eventId ? `customBg_${eventId}` : 'customBg_default';
-
-// ★改善1: LocalStorageを廃止し、システム全体の「唯一の正しいデータ」をここに保持
+// 唯一の正しい進行データ
 let currentStageData = {
   groups: [],
   currentIndex: -1,
@@ -44,8 +41,10 @@ let currentStageData = {
   callActive: false
 };
 
-// ★改善2: 多重発火防止ロック（自動進行バグ対策）
 let lastAutoAdvancedIndex = -1;
+
+const themeKey = eventId ? `theme_${eventId}` : 'theme_default';
+const bgKey = eventId ? `customBg_${eventId}` : 'customBg_default';
 
 function applyTheme() {
   const savedTheme = localStorage.getItem(themeKey) || 'theme-dark';
@@ -92,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
   startApp();
 });
 
-// ★Firebaseへの安全な送信ヘルパー（必ず最新のcurrentStageDataをベースにする）
 function updateCloud(newData) {
   if (!isAdmin) return;
   set(dbRef, newData).catch(err => {
@@ -104,14 +102,11 @@ function updateCloud(newData) {
 function startApp() {
   setInterval(updateDisplay, 500);
 
-  // 設定パネルの制御
+  // 設定パネル
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
   document.querySelectorAll('.theme-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      localStorage.setItem(themeKey, e.target.getAttribute('data-theme'));
-      applyTheme();
-    };
+    btn.onclick = (e) => { localStorage.setItem(themeKey, e.target.getAttribute('data-theme')); applyTheme(); };
   });
   document.getElementById('bgImageInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -131,17 +126,42 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // チャット同期
+  // ==========================================
+  // ★完璧に再構築したスマートチャットシステム
+  // ==========================================
   const chatArea = document.getElementById('chatArea');
-  onValue(chatRef, (snapshot) => {
+  let isUserScrolling = false;
+
+  // ユーザーが過去を読んでいるかを検知（上から10px以上スクロールしているか）
+  if (chatArea) {
+    chatArea.addEventListener('scroll', () => {
+      isUserScrolling = chatArea.scrollTop > 10;
+    });
+  }
+
+  // クラッシュ防止：最新の100件だけを取得するセーフティネット
+  const safeChatQuery = query(chatRef, limitToLast(100));
+
+  onValue(safeChatQuery, (snapshot) => {
     if (!chatArea) return;
-    chatArea.innerHTML = ''; 
-    if (!snapshot.exists()) return;
+    
+    // 更新前のスクロール状態を記憶
+    const previousScrollHeight = chatArea.scrollHeight;
+    const previousScrollTop = chatArea.scrollTop;
+
+    if (!snapshot.exists()) {
+      chatArea.innerHTML = ''; 
+      return;
+    }
 
     const messages = [];
     snapshot.forEach((childSnap) => { messages.push(childSnap.val()); });
 
-    messages.forEach((msg) => {
+    // 描画負荷を極限まで下げるDocumentFragment
+    const fragment = document.createDocumentFragment();
+
+    // ★最新が一番上になるように反転
+    messages.reverse().forEach((msg) => {
       const div = document.createElement('div');
       div.style.marginBottom = '8px';
       div.style.borderBottom = '1px solid rgba(128,128,128,0.3)';
@@ -166,13 +186,25 @@ function startApp() {
       div.appendChild(timeSpan);
       div.appendChild(nameSpan);
       div.appendChild(textSpan);
-      chatArea.appendChild(div);
+      fragment.appendChild(div); // 画面に直接ではなく透明な箱に追加
     });
 
-    setTimeout(() => { chatArea.scrollTop = chatArea.scrollHeight; }, 50);
-  });
+    chatArea.innerHTML = ''; 
+    chatArea.appendChild(fragment); // 一気に画面へ反映（チラつき防止）
 
-  // ★重要：データの完全同期（Firebaseからの受信のみで内部状態を上書きする）
+    // ★UX保護：スマートスクロール発動
+    if (!isUserScrolling) {
+      // トップにいる時はそのまま最新（一番上）を見せる
+      chatArea.scrollTop = 0;
+    } else {
+      // 過去を読んでいる最中は、新着が上に入った「高さの差分」だけスクロール位置をズラし、
+      // ユーザーの視界を1ミリも動かさない
+      chatArea.scrollTop = previousScrollTop + (chatArea.scrollHeight - previousScrollHeight);
+    }
+  });
+  // ==========================================
+
+  // タイマー進行データの同期
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -186,7 +218,7 @@ function startApp() {
       };
     } else {
       currentStageData = { groups: [], currentIndex: -1, startTime: 0, firstGroupStartTime: 0, endTime: 0, callActive: false };
-      lastAutoAdvancedIndex = -1; // リセット時はロックも解除
+      lastAutoAdvancedIndex = -1;
     }
     renderGroupList();
     updateDisplay();
@@ -204,13 +236,20 @@ function startApp() {
         time: getSyncedTime() 
       });
       msgInput.value = '';
+      
+      // ★自分が送信した時は、過去を読んでいても強制的に一番上（最新）に戻してあげる
+      if (chatArea) chatArea.scrollTop = 0;
     }
   };
 
   if (sendBtn) sendBtn.onclick = sendMessage;
   if (msgInput) {
     msgInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+      // スマホ変換確定時の暴発防止と、Enter送信の両立
+      if (e.key === 'Enter' && !e.isComposing) { 
+        e.preventDefault(); 
+        sendMessage(); 
+      }
     });
   }
 
@@ -220,7 +259,6 @@ function startApp() {
     if (adminPanel) adminPanel.classList.remove('hidden');
     document.getElementById('clearChatBtn').classList.remove('hidden');
 
-    // ★改善3：団体追加時の厳格なバリデーション
     document.getElementById('addBtn').onclick = () => {
       const name = document.getElementById('groupInput').value.trim();
       const mins = parseInt(document.getElementById('minutesInput').value);
@@ -275,7 +313,6 @@ function startApp() {
   }
 }
 
-// 進行用ヘルパー
 function startGroupIdx(newIndex) {
   const newData = { ...currentStageData };
   newData.currentIndex = newIndex;
@@ -288,7 +325,6 @@ function startGroupIdx(newIndex) {
   updateCloud(newData);
 }
 
-// 共通関数のグローバル登録（リストからの直接操作用）
 window.insertGroup = (index) => {
   const name = prompt("上に挿入する団体名を入力:");
   if (!name || !name.trim()) return;
@@ -401,12 +437,11 @@ function updateDisplay() {
         }
     }
 
-    // ★改善2：自動進行機能の多重発火を完全にロック
     if (isAdmin && remaining <= 0) {
       const autoCheck = document.getElementById('autoAdvance');
       if (autoCheck && autoCheck.checked && remaining < -2000) {
         if (lastAutoAdvancedIndex !== idx) {
-            lastAutoAdvancedIndex = idx; // ここでロックをかける
+            lastAutoAdvancedIndex = idx;
             startGroupIdx(idx + 1);
         }
       }
