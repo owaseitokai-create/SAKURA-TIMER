@@ -18,7 +18,7 @@ const db = getDatabase(app);
 // --- 部屋(イベント)の判定と初期化 ---
 const urlParams = new URLSearchParams(window.location.search);
 const eventId = urlParams.get('id');
-const isAdmin = urlParams.get('pw') === 'seito'; // ※運用時はパスワードをここでも変更できます
+const isAdmin = urlParams.get('pw') === 'seito';
 
 let dbRef, chatRef; 
 
@@ -37,13 +37,12 @@ function applyTheme() {
 
 // 初期化処理
 document.addEventListener('DOMContentLoaded', () => {
-  applyTheme(); // 背景を反映
+  applyTheme();
 
   // 1. ログイン画面の処理
   if (!eventId) {
     document.getElementById('loginOverlay').classList.remove('hidden');
     
-    // パスワード入力欄の表示切替
     document.getElementById('loginIsAdmin').addEventListener('change', (e) => {
       const pwInput = document.getElementById('loginAdminPw');
       if(e.target.checked) pwInput.classList.remove('hidden');
@@ -61,21 +60,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let nextUrl = `?id=${inputId}`;
       if (isAdminCheck) nextUrl += `&pw=seito`;
-      window.location.href = nextUrl; // URLを変えてリロード
+      window.location.href = nextUrl;
     });
-    return; // イベントIDがない場合はここで処理を止める
+    return;
   }
 
   // 2. イベントIDがある場合（通常起動）
   document.getElementById('roomNameDisplay').textContent = `Room: ${eventId}`;
   
-  // FirebaseのパスをイベントIDごとに分ける
   dbRef = ref(db, `events/${eventId}/stageData`);
   chatRef = ref(db, `events/${eventId}/chatMessages`);
 
   startApp();
 });
-
 
 // =========================================================
 //  アプリメイン処理
@@ -83,11 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function startApp() {
   setInterval(updateDisplay, 500);
 
-  // 設定モーダルの操作 (閲覧者・管理者共通で使える)
+  // 設定モーダルの操作
   document.getElementById('openSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.remove('hidden');
   document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
   
-  // テーマ変更ボタン
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.onclick = (e) => {
       const theme = e.target.getAttribute('data-theme');
@@ -96,7 +92,6 @@ function startApp() {
     };
   });
 
-  // カスタム画像アップロード
   document.getElementById('bgImageInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -116,7 +111,7 @@ function startApp() {
     document.getElementById('bgImageInput').value = "";
   };
 
-  // チャット読み込み
+  // チャット
   const chatArea = document.getElementById('chatArea');
   onChildAdded(chatRef, (snapshot) => {
     const msg = snapshot.val();
@@ -129,7 +124,7 @@ function startApp() {
     if (chatArea) chatArea.prepend(div);
   });
 
-  // Firebaseデータ同期
+  // データ同期 (endTimeを追加)
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -137,6 +132,7 @@ function startApp() {
       localStorage.setItem('currentIndex', (data.currentIndex !== undefined) ? data.currentIndex : -1);
       localStorage.setItem('startTime', (data.startTime !== undefined) ? data.startTime : 0);
       localStorage.setItem('firstGroupStartTime', (data.firstGroupStartTime !== undefined) ? data.firstGroupStartTime : 0);
+      localStorage.setItem('endTime', (data.endTime !== undefined) ? data.endTime : 0); // ★追加
       localStorage.setItem('callActive', data.callActive);
       
       renderGroupList();
@@ -144,7 +140,7 @@ function startApp() {
     }
   });
 
-  // チャット送信
+  // 送信ボタン
   const sendBtn = document.getElementById('sendChatBtn');
   if (sendBtn) sendBtn.onclick = () => {
     const nameInput = document.getElementById('chatName');
@@ -157,7 +153,7 @@ function startApp() {
     }
   };
 
-  // --- 管理者専用エリアの構築 ---
+  // --- 管理パネル ---
   const adminPanel = document.getElementById('adminPanel');
   const clearChatBtn = document.getElementById('clearChatBtn');
 
@@ -165,7 +161,6 @@ function startApp() {
     if (adminPanel) adminPanel.classList.remove('hidden');
     if (clearChatBtn) clearChatBtn.classList.remove('hidden');
 
-    // 下に追加ボタン
     const addBtn = document.getElementById('addBtn');
     if (addBtn) addBtn.onclick = () => {
       const nameInput = document.getElementById('groupInput');
@@ -206,13 +201,22 @@ function startApp() {
         if(confirm('最初の団体からスタートしますか？')){ window.startGroup(0); }
     };
 
+    // ★次の団体へボタンのロジック（終了確認を追加）
     const nextBtn = document.getElementById('nextBtn');
     if (nextBtn) nextBtn.onclick = () => {
         const idx = parseInt(localStorage.getItem('currentIndex') || '-1');
         const groups = JSON.parse(localStorage.getItem('groups') || '[]');
+        const nextIdx = idx + 1;
         
-        if (idx < groups.length) {
-            window.startGroup(idx + 1);
+        if (nextIdx < groups.length) {
+            window.startGroup(nextIdx);
+        } else if (nextIdx === groups.length) {
+            if (confirm("全ての演目を終了しますか？")) {
+                localStorage.setItem('currentIndex', nextIdx);
+                localStorage.setItem('endTime', Date.now()); // 終了時刻を記録
+                syncToCloud();
+                updateDisplay();
+            }
         }
     };
   } else {
@@ -231,6 +235,7 @@ function syncToCloud() {
     currentIndex: parseInt(localStorage.getItem('currentIndex') || '-1'),
     startTime: parseInt(localStorage.getItem('startTime') || '0'), 
     firstGroupStartTime: parseInt(localStorage.getItem('firstGroupStartTime') || '0'),
+    endTime: parseInt(localStorage.getItem('endTime') || '0'), // ★追加
     callActive: localStorage.getItem('callActive') === 'true'
   };
   set(dbRef, data);
@@ -255,7 +260,10 @@ const formatDiff = (diffMs) => {
 window.startGroup = (newIndex) => {
   localStorage.setItem('currentIndex', newIndex);
   localStorage.setItem('startTime', Date.now());
-  if (newIndex === 0) localStorage.setItem('firstGroupStartTime', Date.now());
+  if (newIndex === 0) {
+      localStorage.setItem('firstGroupStartTime', Date.now());
+      localStorage.setItem('endTime', 0); // リセット
+  }
   localStorage.setItem('callActive', 'false');
   syncToCloud();
 };
@@ -288,12 +296,32 @@ function updateDisplay() {
   const nextGroupEl = document.getElementById('nextGroupName');
   const nextPrepEl = document.getElementById('nextPrepareMsg');
 
-  // 全演目終了状態
+  // ★全演目終了状態（全体の押し巻き計算）
   if (idx === groups.length && groups.length > 0) {
     if (currentGroupEl) currentGroupEl.textContent = "🎉 全演目終了";
-    if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#888"; }
-    if (diffEl) diffEl.textContent = "お疲れ様でした";
-    if (statusEl) { statusEl.textContent = "終了"; statusEl.style.color = "#888"; }
+    if (timerEl) { timerEl.textContent = "00:00"; timerEl.style.color = "#fff"; }
+    
+    const endTime = parseInt(localStorage.getItem('endTime') || '0');
+    
+    if (firstGroupStartTime > 0 && endTime > 0) {
+        let totalElapsed = 0;
+        for (let i = 0; i < groups.length; i++) totalElapsed += groups[i].minutes * 60000;
+        const idealEndTime = firstGroupStartTime + totalElapsed;
+        const diff = endTime - idealEndTime;
+
+        if (diffEl) {
+            diffEl.textContent = formatDiff(diff);
+            if (diff > 60000) diffEl.style.color = '#ff3b30';
+            else if (diff < -60000) diffEl.style.color = '#00e5ff'; 
+            else diffEl.style.color = '#4caf50';
+        }
+        if (statusEl) {
+             if (diff > 60000) { statusEl.textContent = '全体押し'; statusEl.style.color = '#ff3b30'; }
+             else if (diff < -60000) { statusEl.textContent = '全体巻き'; statusEl.style.color = '#00e5ff'; }
+             else { statusEl.textContent = '予定通り'; statusEl.style.color = '#4caf50'; }
+        }
+    }
+
     if (nextGroupEl) nextGroupEl.textContent = "なし";
     if (nextPrepEl) nextPrepEl.classList.add('hidden');
   } 

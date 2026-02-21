@@ -87,7 +87,8 @@ button:active { transform: scale(0.95); }
 .btn-primary { background-color: var(--accent-color) !important; color: #ffffff !important; }
 .btn-danger { background-color: #ff3b30 !important; color: #ffffff !important; }
 
-/* 進行操作パネルのボタン左右対称化 */
+/* 進行操作パネルのボタンレイアウト調整 */
+.btn-row { display: flex; gap: 10px; margin-bottom: 20px; } /* ←★ここを20pxに広げて下とくっつかないようにしました */
 .symmetrical-row { display: flex; gap: 10px; justify-content: space-between; width: 100%; }
 .btn-start { background-color: #28a745 !important; color: #ffffff !important; flex: 1; padding: 14px; font-size: 1.1rem; }
 .btn-next { background-color: #ff9500 !important; color: #ffffff !important; flex: 1; padding: 14px; font-size: 1.1rem; }
